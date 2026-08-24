@@ -1072,7 +1072,6 @@ void StickerSetBox::updateButtons() {
 							strongInner->showToast(tr::ayu_IDCopiedToast(tr::now));
 						},
 						&st::menuIconCopy);
-				addPackIdActions(raw);
 				}
 			}
 		};
@@ -1185,6 +1184,7 @@ void StickerSetBox::updateButtons() {
 				if (fillSetCreatorFooter) {
 					fillSetCreatorFooter(raw);
 				}
+				addPackIdActions(raw);
 				raw->setForcedOrigin(
 					Ui::PanelAnimation::Origin::TopRight);
 				top->setForceRippled(true);

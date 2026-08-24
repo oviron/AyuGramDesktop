@@ -66,6 +66,7 @@ enum class MediaCheckResult {
 	Unsupported,
 	Empty,
 	HasExpiredMediaTimeToLive,
+	HasUnsupportedTimeToLive,
 	HasStoryMention,
 };
 [[nodiscard]] MediaCheckResult CheckMessageMedia(

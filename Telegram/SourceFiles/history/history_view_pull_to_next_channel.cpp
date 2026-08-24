@@ -1027,8 +1027,6 @@ void PullToNextChannel::pushIndicator() {
 	_effective = effective;
 	_scroll->setContentBottomInset(std::max(0, int(base::SafeRound(
 		_jumping ? effective : (effective - _pull)))));
-	const auto hintVisible = (_parent->height()
-		> _scroll->y() + _scroll->height()) && (_pull > 0.);
 	if (_mode == Mode::History) {
 		const auto next = _next.get();
 		_indicator->setHistoryData(effective, _reached, next);
@@ -1062,8 +1060,6 @@ void PullToNextChannel::updateGeometry() {
 	if (bottom > top) {
 		_hint->setGeometry(_scroll->x(), top, _scroll->width(), bottom - top);
 		_hint->raise();
-	} else {
-		_hint->hideNow();
 	}
 }
 

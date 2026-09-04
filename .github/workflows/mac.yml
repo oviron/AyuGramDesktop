@@ -1,0 +1,89 @@
+name: AyuGram macOS arm64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/ayu-7.2.5
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ayugram-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Debug arm64
+    runs-on: macos-15
+    env:
+      REPO_NAME: AyuGramDesktop
+      PREPARE_PATH: Telegram/build/prepare/prepare.py
+
+    steps:
+      - name: Clone sources
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+
+      - name: Install build tools
+        run: |
+          sudo chown -R `whoami`:admin /usr/local/share
+          brew install automake libtool meson nasm ninja pkg-config
+          sudo mdutil -a -i off
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
+
+      - name: Restore libraries cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: macos-arm64-libs-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
+          restore-keys: macos-arm64-libs-
+
+      - name: Prepare libraries
+        run: ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+
+      - name: Free disk space
+        run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
+
+      - name: Configure AyuGram
+        working-directory: ${{ env.REPO_NAME }}/Telegram
+        run: |
+          ./configure.sh \
+            -D CMAKE_CONFIGURATION_TYPES=Debug \
+            -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -D CMAKE_OSX_ARCHITECTURES=arm64 \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -D TDESKTOP_API_TEST=ON \
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
+
+      - name: Build AyuGram
+        working-directory: ${{ env.REPO_NAME }}/Telegram
+        run: cmake --build ../out --config Debug --parallel --target Telegram
+
+      - name: Verify and package app
+        working-directory: ${{ env.REPO_NAME }}/out/Debug
+        run: |
+          test -d AyuGram.app
+          file AyuGram.app/Contents/MacOS/AyuGram | tee AyuGram-7.2.5-architecture.txt
+          grep -q arm64 AyuGram-7.2.5-architecture.txt
+          codesign --force --deep --sign - AyuGram.app
+          codesign --verify --deep --strict AyuGram.app
+          ditto -c -k --sequesterRsrc --keepParent AyuGram.app AyuGram-7.2.5-macOS-arm64.zip
+          shasum -a 256 AyuGram-7.2.5-macOS-arm64.zip > AyuGram-7.2.5-macOS-arm64.zip.sha256
+
+      - name: Upload AyuGram
+        uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-7.2.5-macOS-arm64
+          path: |
+            ${{ env.REPO_NAME }}/out/Debug/AyuGram-7.2.5-macOS-arm64.zip
+            ${{ env.REPO_NAME }}/out/Debug/AyuGram-7.2.5-macOS-arm64.zip.sha256
+            ${{ env.REPO_NAME }}/out/Debug/AyuGram-7.2.5-architecture.txt
+          retention-days: 7

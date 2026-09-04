@@ -1264,44 +1264,46 @@ void SendFilesBox::addMenuButton() {
 		_menu = base::make_unique_q<Ui::PopupMenu>(top, tabbed.menu);
 		_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 		const auto position = QCursor::pos();
-		SendMenu::FillSendMenu(
+		const auto result = SendMenu::FillSendMenu(
 			_menu.get(),
 			_show,
 			_sendMenuDetails(),
 			_sendMenuCallback,
 			&_st.tabbed.icons,
 			position);
+		if (result != SendMenu::FillMenuResult::Prepared) {
+			_menu = nullptr;
+			return true;
+		}
 
 		using ImageInfo = Ui::PreparedFileInformation::Image;
-		if (_list.files.size() == 1 && std::get_if<ImageInfo>(&_list.files[0].information->media)) {
+		if (_list.files.size() == 1
+			&& std::get_if<ImageInfo>(&_list.files[0].information->media)) {
 			_menu->addAction(
 				tr::ayu_SendAsSticker(tr::now),
-				[=]() mutable
-				{
+				[=]() mutable {
 					const auto file = std::move(_list.files[0]);
 					_list.files.clear();
-
-					const auto sourceImage = std::get_if<ImageInfo>(&file.information->media);
-
+					const auto sourceImage = std::get_if<ImageInfo>(
+						&file.information->media);
 					QByteArray targetArray;
 					QBuffer buffer(&targetArray);
 					buffer.open(QIODevice::WriteOnly);
 					sourceImage->data.save(&buffer, "WEBP");
-
 					QImage targetImage;
 					targetImage.loadFromData(targetArray, "WEBP");
-
-					addFiles(Storage::PrepareMediaFromImage(std::move(targetImage),
-															std::move(targetArray),
-															st::sendMediaPreviewSize));
+					addFiles(Storage::PrepareMediaFromImage(
+						std::move(targetImage),
+						std::move(targetArray),
+						st::sendMediaPreviewSize));
 					_list.overrideSendImagesAsPhotos = false;
 					initSendWay();
-
 					send({}, false);
 				},
 				&st::menuIconStickers);
+			_menu->prepareGeometryFor(position);
 		}
-		_menu->popup(position);
+		_menu->popupPrepared();
 		return true;
 	});
 }

@@ -30,7 +30,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          sudo chown -R `whoami`:admin /usr/local/share
+          sudo chown -R "$(whoami)":admin /usr/local/share
           brew install automake libtool meson nasm ninja pkg-config
           sudo mdutil -a -i off
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -46,7 +46,7 @@ jobs:
           restore-keys: macos-arm64-libs-
 
       - name: Prepare libraries
-        run: ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+        run: ./"$REPO_NAME"/Telegram/build/prepare/mac.sh skip-release silent
 
       - name: Free disk space
         run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete

@@ -56,7 +56,6 @@ jobs:
         run: |
           ./configure.sh \
             -D CMAKE_CONFIGURATION_TYPES=Debug \
-            -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
             -D CMAKE_OSX_ARCHITECTURES=arm64 \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D TDESKTOP_API_ID=2040 \

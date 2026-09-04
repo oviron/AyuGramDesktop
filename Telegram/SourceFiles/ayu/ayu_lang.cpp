@@ -16,7 +16,7 @@
 #include <QFile>
 #include <QSaveFile>
 #include <QRegularExpression>
-#include <QNetworkProxy>
+#include <QtNetwork/QNetworkProxy>
 #include <algorithm>
 
 // hard-coded languages

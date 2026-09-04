@@ -1,4 +1,7 @@
 <RCC>
+  <qresource prefix="/ayu/languages">
+    <file alias="ru.json">../../ayu/languages/ru.json</file>
+  </qresource>
   <qresource prefix="/gui">
     <file alias="art/background.tgv">../../art/background.tgv</file>
     <file alias="art/bg_thumbnail.png">../../art/bg_thumbnail.png</file>

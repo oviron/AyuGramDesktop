@@ -2424,7 +2424,7 @@ elseif (APPLE)
     target_link_frameworks_weak(Telegram PRIVATE UserNotifications)
 
     set(icons_path ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets)
-    if (CMAKE_GENERATOR STREQUAL Xcode)
+    if (CMAKE_GENERATOR STREQUAL Xcode AND XCODE_VERSION VERSION_GREATER_EQUAL 26)
         set(ayugram_icons
             Default
             Alt
@@ -2549,9 +2549,9 @@ if (build_macstore)
     )
 else()
     if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(bundle_identifier "one.ayugram.AyuGramDesktop$<$<CONFIG:Debug>:Debug>")
+        set(bundle_identifier "one.ayugram.OvironDesktop$<$<CONFIG:Debug>:Debug>")
     else()
-        set(bundle_identifier "one.ayugram.AyuGramDesktop")
+        set(bundle_identifier "one.ayugram.OvironDesktop")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
     set(output_name "AyuGram")

@@ -1604,7 +1604,7 @@ mac:
     CONFIGURATIONS=-debug
     ASSERTS=
 release:
-    CONFIGURATIONS=-debug-and-release
+    CONFIGURATIONS=-release
 mac_asserts:
     ASSERTS=-force-asserts
 mac:
@@ -1625,7 +1625,7 @@ mac:
         -no-feature-brotli \
         -no-feature-cxx17_filesystem \
         -platform macx-clang -- \
-        -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+        -DCMAKE_OSX_ARCHITECTURES="arm64" \
         -DCMAKE_PREFIX_PATH="$USED_PREFIX" \
         -DQT_NO_HANDLE_APPLE_SINGLE_ARCH_CROSS_COMPILING=ON \
         -DQT_SYNC_HEADERS_AT_CONFIGURE_TIME=ON

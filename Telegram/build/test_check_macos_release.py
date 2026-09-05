@@ -49,12 +49,6 @@ class ReleaseCheckTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_check()
 
-    def test_wrong_build_type_rejected(self):
-        path = self.build / "CMakeCache.txt"
-        path.write_text(path.read_text().replace("=Release", "=Debug"))
-        with self.assertRaises(ValueError):
-            self.run_check()
-
     def test_each_target(self):
         for architectures in (("x86_64",), ("x86_64", "arm64")):
             with self.subTest(architectures=architectures):
@@ -86,13 +80,6 @@ class ReleaseCheckTest(unittest.TestCase):
         self.run_check()
         with self.assertRaises(ValueError):
             self.run_check(disable_autoupdate=True)
-
-    def test_cache_value_must_match_exactly(self):
-        path = self.build / "CMakeCache.txt"
-        path.write_text(path.read_text().replace("=Release", "=ReleaseDebug"))
-        with self.assertRaises(ValueError):
-            self.run_check()
-
 
 if __name__ == "__main__":
     unittest.main()

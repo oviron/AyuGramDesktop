@@ -115,17 +115,14 @@ QString AyuLanguage::getCachePath(const QString &langId) const {
 void AyuLanguage::loadCachedLanguage() {
 	for (const auto &id : { _currentLangId, _baseLangId }) {
 		if (id.isEmpty()) continue;
-		for (const auto &path : {
-			getCachePath(id), u":/ayu/languages/"_q + id + u".json"_q }) {
-			QFile file(path);
-			if (!file.open(QIODevice::ReadOnly)) continue;
-			const auto doc = QJsonDocument::fromJson(file.readAll());
-			if (!ValidLanguage(doc)) continue;
-			_document = doc;
-			LOG(("Loading AyuGram language: %1").arg(id));
-			applyLanguageJson(doc);
-			return;
-		}
+		QFile file(getCachePath(id));
+		if (!file.open(QIODevice::ReadOnly)) continue;
+		const auto doc = QJsonDocument::fromJson(file.readAll());
+		if (!ValidLanguage(doc)) continue;
+		_document = doc;
+		LOG(("Loading AyuGram language: %1").arg(id));
+		applyLanguageJson(doc);
+		return;
 	}
 }
 

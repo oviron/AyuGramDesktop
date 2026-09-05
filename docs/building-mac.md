@@ -19,7 +19,12 @@ and export them in the build shell. Do not commit credentials.
 
 ## Release preview
 
-From the checkout root, build a universal package:
+The release workflow builds `arm64` and `x86_64` separately, then combines every
+architecture-dependent Mach-O file with `lipo`. This preserves Swift-based local
+translation, which CMake cannot configure with multiple values in
+`CMAKE_OSX_ARCHITECTURES`.
+
+For a local single-architecture Release build:
 
 ```bash
 ./Telegram/build/prepare/mac.sh silent qt-release-only
@@ -27,24 +32,24 @@ cd Telegram
 ./configure.sh -G Ninja \
   -D CMAKE_BUILD_TYPE=Release \
   -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -D 'CMAKE_OSX_ARCHITECTURES=x86_64;arm64' \
-  -D DESKTOP_APP_MAC_ARCH= \
+  -D CMAKE_OSX_ARCHITECTURES=arm64 \
+  -D DESKTOP_APP_MAC_ARCH=arm64 \
   -D CMAKE_C_COMPILER_LAUNCHER=ccache \
   -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
   -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
   -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
   -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
 python3 build/check_macos_release.py ../out \
-  --architectures x86_64 arm64 --disable-autoupdate
+  --architectures arm64 --disable-autoupdate
 cmake --build ../out --parallel 3 --target Telegram
 ```
 
 The result is `out/AyuGram.app`. Preview builds are not a public signed release;
 see [release requirements](releasing.md).
 
-For Apple Silicon only, append `mac-arm64` to the preparation command and set
-both `CMAKE_OSX_ARCHITECTURES` and `DESKTOP_APP_MAC_ARCH` to `arm64`. Pass only
-`arm64` to the checker. For Intel only, use `mac-x86_64` and `x86_64` instead.
+Append `mac-arm64` to preparation when only Apple Silicon dependencies are
+needed. For Intel only, use `mac-x86_64` and `x86_64` instead. Do not configure
+a single CMake tree with both architectures while Swift translation is enabled.
 Other dependencies retain their upstream universal build recipes.
 
 ## Debug and Xcode development
@@ -59,11 +64,10 @@ configuration there. Use Release for daily use and distribution.
 
 ## CI and updates
 
-The `AyuGram macOS` workflow accepts the target architecture on manual dispatch.
-It checks the generated compiler commands, Qt linkage, bundle identity, icon
-and packaged architectures, then produces a ZIP with checksum and source SHA.
-Credentials come from repository configuration, not from a particular owner
-or branch name. The full build is not triggered on every push.
+The `Release` workflow checks generated compiler commands and Qt linkage for
+both architecture builds, then checks the combined bundle identity, icon and
+packaged architectures before creating the DMG. Credentials come from repository
+configuration, not from a branch. The full build is not triggered on push.
 
 Automatic updates remain disabled for these preview packages until the
 distribution has a verified signing and update channel. This does not change

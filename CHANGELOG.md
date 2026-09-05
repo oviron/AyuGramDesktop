@@ -1,6 +1,6 @@
 # Changelog
 
-## 7.2.5 - 2026-09-05
+## 7.2.5 - 2026-09-06
 
 - Updated the application base to Telegram Desktop 7.2.5.
 - Preserved AyuGram features and upstream attribution without fork-specific branding.

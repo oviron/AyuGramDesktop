@@ -133,30 +133,33 @@ jobs:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-macos-universal-release-${{ steps.toolchain.outputs.id }}-${{ github.sha }}
           restore-keys: ccache-macos-universal-release-${{ steps.toolchain.outputs.id }}-
-      - name: Configure Release
+      - name: Build both Release architectures
         working-directory: ${{ env.REPO_NAME }}/Telegram
         run: |
-          ./configure.sh -G Ninja \
-            -D CMAKE_BUILD_TYPE=Release \
-            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -D 'CMAKE_OSX_ARCHITECTURES=x86_64;arm64' \
-            -D DESKTOP_APP_MAC_ARCH= \
-            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
-            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -D CMAKE_OBJC_COMPILER_LAUNCHER=ccache \
-            -D CMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
-            -D 'CMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
-            -D 'CMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
-            -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
-            -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
-            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
-            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
-          python3 build/check_macos_release.py ../out \
-            --architectures x86_64 arm64 --disable-autoupdate
-      - name: Build AyuGram
-        working-directory: ${{ env.REPO_NAME }}
-        run: |
-          cmake --build out --parallel 3 --target Telegram
+          mkdir -p ../mac-apps
+          for architecture in arm64 x86_64; do
+            rm -rf ../out
+            ./configure.sh -G Ninja \
+              -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -D "CMAKE_OSX_ARCHITECTURES=$architecture" \
+              -D "DESKTOP_APP_MAC_ARCH=$architecture" \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_OBJC_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
+              -D 'CMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
+              -D 'CMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
+              -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
+              -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
+              -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+              -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+            python3 build/check_macos_release.py ../out \
+              --architectures "$architecture" --disable-autoupdate
+            cmake --build ../out --parallel 3 --target Telegram
+            mkdir -p "../mac-apps/$architecture"
+            ditto ../out/AyuGram.app "../mac-apps/$architecture/AyuGram.app"
+          done
           ccache --show-stats
       - name: Save compiler cache
         if: always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
@@ -165,9 +168,28 @@ jobs:
           path: ${{ env.CCACHE_DIR }}
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: Verify app and create DMG
-        working-directory: ${{ env.REPO_NAME }}/out
+        working-directory: ${{ env.REPO_NAME }}
         run: |
-          app=AyuGram.app
+          app=release/AyuGram.app
+          arm=mac-apps/arm64/AyuGram.app
+          intel=mac-apps/x86_64/AyuGram.app
+          rm -rf release dmg artifacts
+          mkdir -p release
+          ditto "$arm" "$app"
+          while IFS= read -r -d '' arm_file; do
+            if ! file "$arm_file" | grep -q 'Mach-O'; then continue; fi
+            relative=${arm_file#"$arm/"}
+            intel_file="$intel/$relative"
+            output="$app/$relative"
+            test -f "$intel_file"
+            arm_archs=" $(lipo -archs "$arm_file") "
+            intel_archs=" $(lipo -archs "$intel_file") "
+            if [[ "$arm_archs" == *' arm64 '* && "$arm_archs" == *' x86_64 '* ]]; then
+              continue
+            fi
+            [[ "$arm_archs" == *' arm64 '* && "$intel_archs" == *' x86_64 '* ]]
+            lipo -create "$arm_file" "$intel_file" -output "$output"
+          done < <(find "$arm" -type f -print0)
           test -s "$app/Contents/MacOS/AyuGram"
           test -s "$app/Contents/Resources/Telegram.rcc"
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
@@ -197,7 +219,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: release-macos-${{ github.sha }}
-          path: ${{ env.REPO_NAME }}/out/artifacts/AyuGram.dmg
+          path: ${{ env.REPO_NAME }}/artifacts/AyuGram.dmg
           if-no-files-found: error
           compression-level: 0
           retention-days: 7

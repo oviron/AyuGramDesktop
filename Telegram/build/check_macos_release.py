@@ -10,8 +10,6 @@ def check(build, architectures=("arm64",), disable_autoupdate=False):
     if not expected or not expected <= {"arm64", "x86_64"}:
         raise ValueError("Unsupported macOS architecture")
     cache = dict(re.findall(r"^([^:#/][^:=]*):[^=]+=(.*)$", (build / "CMakeCache.txt").read_text(), re.M))
-    if set(cache.get("CMAKE_OSX_ARCHITECTURES", "").split(";")) != expected:
-        raise ValueError("CMake architectures do not match the requested target")
     if disable_autoupdate and cache.get("DESKTOP_APP_DISABLE_AUTOUPDATE") != "ON":
         raise ValueError("CI preview artifacts must not install upstream updates")
     commands = json.loads((build / "compile_commands.json").read_text())

@@ -142,19 +142,19 @@ jobs:
             rm -rf ../out
             ./configure.sh -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
-              -D "CMAKE_OSX_ARCHITECTURES=$architecture" \
-              -D "DESKTOP_APP_MAC_ARCH=$architecture" \
-              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
-              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-              -D CMAKE_OBJC_COMPILER_LAUNCHER=ccache \
-              -D CMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
-              -D 'CMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
-              -D 'CMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
-              -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
-              -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
-              -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
-              -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              "-DCMAKE_OSX_ARCHITECTURES=$architecture" \
+              "-DDESKTOP_APP_MAC_ARCH=$architecture" \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
+              '-DCMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
+              '-DCMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
+              "-DTDESKTOP_API_ID=$TDESKTOP_API_ID" \
+              "-DTDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
+              -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+              -DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
             python3 build/check_macos_release.py ../out \
               --architectures "$architecture" --disable-autoupdate
             cmake --build ../out --parallel 3 --target Telegram

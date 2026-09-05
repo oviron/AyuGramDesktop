@@ -31,14 +31,14 @@ For a local single-architecture Release build:
 cd Telegram
 ./configure.sh -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -D CMAKE_OSX_ARCHITECTURES=arm64 \
-  -D DESKTOP_APP_MAC_ARCH=arm64 \
-  -D CMAKE_C_COMPILER_LAUNCHER=ccache \
-  -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-  -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
-  -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
-  -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DDESKTOP_APP_MAC_ARCH=arm64 \
+  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  "-DTDESKTOP_API_ID=$TDESKTOP_API_ID" \
+  "-DTDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
+  -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON
 python3 build/check_macos_release.py ../out \
   --architectures arm64 --disable-autoupdate
 cmake --build ../out --parallel 3 --target Telegram

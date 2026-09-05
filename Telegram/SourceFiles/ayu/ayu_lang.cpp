@@ -181,7 +181,7 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 		auto key = qsl("ayu_") + brokenKey;
 		auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&"));
 
-		if (key.endsWith("_Android")) {
+		if (val.isEmpty() || key.endsWith("_Android")) {
 			continue;
 		}
 

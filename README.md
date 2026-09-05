@@ -4,6 +4,15 @@
 
 [ English  |   [Русский](README-RU.md) ]
 
+This development fork continues AyuGram on Telegram Desktop 7.2.5. It keeps
+the AyuGram name, features and upstream attribution. It is not an official
+release from the upstream maintainers.
+
+The update builds on [PR #460](https://github.com/AyuGram/AyuGramDesktop/pull/460).
+macOS Apple Silicon has been built and tested in daily use. Intel macOS,
+Windows and Linux still need verification on this branch. See the
+[build and release requirements](docs/releasing.md) before distributing binaries.
+
 ## Features
 
 - Full ghost mode (flexible)
@@ -36,6 +45,10 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 </h3>
 
 ## Downloads
+
+The packages and package-manager commands below belong to the upstream project
+or their respective maintainers. They do not install this branch.
+This branch's macOS CI produces preview artifacts, not signed public releases.
 
 ### Windows
 

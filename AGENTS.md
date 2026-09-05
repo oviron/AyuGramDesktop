@@ -64,7 +64,10 @@ Telegram/build/docker/centos_env/build_debug.sh
 cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
 ```
 
-**Never build Release** - it's extremely heavy and not needed for testing changes.
+Use Debug for diagnostic builds. User-facing packages must use Release.
+Run cheap source checks first; run a full build only when requested or needed
+to verify the delivery. The macOS workflow and target selection are documented
+in `docs/building-mac.md`.
 
 ## Platform-Specific Requirements
 
@@ -174,8 +177,8 @@ user to close that checkout's Telegram/debugger before rebuilding.
 
 ## Best Practices
 
-1. **Always use Debug builds** - Release builds are extremely heavy
-2. **Don't build Release configuration** - it's too heavy for testing
+1. Use Debug for diagnostic builds, Release for distribution.
+2. Batch changes before expensive builds and preserve dependency/compiler caches.
 
 ## Debug-Only Code
 

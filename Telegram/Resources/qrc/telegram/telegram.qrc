@@ -1,6 +1,29 @@
 <RCC>
   <qresource prefix="/ayu/languages">
+    <file alias="ar.json">../../ayu/languages/ar.json</file>
+    <file alias="be.json">../../ayu/languages/be.json</file>
+    <file alias="de.json">../../ayu/languages/de.json</file>
+    <file alias="el.json">../../ayu/languages/el.json</file>
+    <file alias="eo.json">../../ayu/languages/eo.json</file>
+    <file alias="es.json">../../ayu/languages/es.json</file>
+    <file alias="fa.json">../../ayu/languages/fa.json</file>
+    <file alias="fi.json">../../ayu/languages/fi.json</file>
+    <file alias="fr.json">../../ayu/languages/fr.json</file>
+    <file alias="he.json">../../ayu/languages/he.json</file>
+    <file alias="it.json">../../ayu/languages/it.json</file>
+    <file alias="ja.json">../../ayu/languages/ja.json</file>
+    <file alias="lv.json">../../ayu/languages/lv.json</file>
+    <file alias="os.json">../../ayu/languages/os.json</file>
+    <file alias="pl.json">../../ayu/languages/pl.json</file>
+    <file alias="pt.json">../../ayu/languages/pt.json</file>
+    <file alias="ro.json">../../ayu/languages/ro.json</file>
     <file alias="ru.json">../../ayu/languages/ru.json</file>
+    <file alias="tr.json">../../ayu/languages/tr.json</file>
+    <file alias="uk.json">../../ayu/languages/uk.json</file>
+    <file alias="vi.json">../../ayu/languages/vi.json</file>
+    <file alias="zh.json">../../ayu/languages/zh.json</file>
+    <file alias="zh-hans.json">../../ayu/languages/zh-hans.json</file>
+    <file alias="zh-hant.json">../../ayu/languages/zh-hant.json</file>
   </qresource>
   <qresource prefix="/gui">
     <file alias="art/background.tgv">../../art/background.tgv</file>

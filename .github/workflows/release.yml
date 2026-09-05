@@ -324,7 +324,7 @@ jobs:
         shell: cmd
         run: |
           cd /d %TBUILD%\%REPO_NAME%\Telegram
-          call configure.bat x64 -G "Ninja Multi-Config" ^
+          call configure.bat -G "Ninja Multi-Config" ^
             -D CMAKE_CONFIGURATION_TYPES=Release ^
             -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
             -D "TDESKTOP_API_ID=%TDESKTOP_API_ID%" ^

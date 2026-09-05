@@ -4,14 +4,14 @@
 
 [ English  |   [Русский](README-RU.md) ]
 
-This development fork continues AyuGram on Telegram Desktop 7.2.5. It keeps
-the AyuGram name, features and upstream attribution. It is not an official
-release from the upstream maintainers.
+This maintenance fork provides current AyuGram builds while upstream releases
+are paused. It adds no fork-specific features or personal branding, preserves
+upstream attribution, and offers maintenance changes back to the main project.
+These builds are not official upstream releases.
 
-The update builds on [PR #460](https://github.com/AyuGram/AyuGramDesktop/pull/460).
-macOS Apple Silicon has been built and tested in daily use. Intel macOS,
-Windows and Linux still need verification on this branch. See the
-[build and release requirements](docs/releasing.md) before distributing binaries.
+Version 7.2.5 builds on [PR #460](https://github.com/AyuGram/AyuGramDesktop/pull/460).
+Release artifacts are built from the tagged source by GitHub Actions with
+automatic updates disabled. See [release details](docs/releasing.md).
 
 ## Features
 
@@ -46,9 +46,10 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 
 ## Downloads
 
-The packages and package-manager commands below belong to the upstream project
-or their respective maintainers. They do not install this branch.
-This branch's macOS CI produces preview artifacts, not signed public releases.
+Technical maintenance builds for macOS and Windows are available from this
+fork's [Releases](https://github.com/oviron/AyuGramDesktop/releases). They are
+not publisher-signed or notarized; verify `SHA256SUMS.txt` before installation.
+Package-manager commands below still belong to upstream or their maintainers.
 
 ### Windows
 

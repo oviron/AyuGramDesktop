@@ -8,20 +8,19 @@ official upstream release.
 ## Build checks
 
 `Source checks` runs on pushes and pull requests without production credentials.
-It checks build options, translation resources and workflow syntax. It does not
-compile the C++ application.
+It checks build options and workflow syntax, but does not compile the C++
+application.
 
-`AyuGram macOS` runs manually from Actions on the selected branch. It supports
-`universal` (the default), `arm64` and `x86_64`. Versioned filenames come from
-`Telegram/build/version`, not the workflow. Set the repository variable
-`TDESKTOP_API_ID` and secret `TDESKTOP_API_HASH` to credentials obtained for the
-application through [Telegram](https://core.telegram.org/api/obtaining_api_id).
-Missing credentials stop the job before dependency preparation.
+`Release` runs only by an explicit manual dispatch. It validates the version
+before starting the expensive jobs, then builds universal macOS and Windows x64
+packages plus the full recursive source archive. Dependencies and compiler
+results use separate caches. The workflow creates the tag and public GitHub
+Release only after every build and package check succeeds.
 
-The workflow produces Release preview artifacts with source commit, architecture
-and SHA-256 records. Dependencies and compiler results have separate caches;
-architecture and toolchain changes do not share a final cache key. Full builds
-are manual because a cold macOS build takes hours on hosted runners.
+Set the repository variable `TDESKTOP_API_ID` and secret `TDESKTOP_API_HASH` to
+credentials obtained for the application through
+[Telegram](https://core.telegram.org/api/obtaining_api_id). Missing credentials
+stop platform jobs before dependency preparation.
 
 See [macOS](building-mac.md), [Windows](building-win.md) and
 [Linux](building-linux.md) for the platform build commands. Windows and Linux
@@ -30,28 +29,26 @@ macOS build does not establish compatibility on those platforms.
 
 ## Public release requirements
 
-Before publishing a release:
+Technical maintenance releases use the following contract:
 
-- Build the exact source commit for every advertised platform and architecture.
-  Test startup, login, selected language, updates and the AyuGram features on
-  each supported platform. Keep build/run links with the release evidence.
+- Build the exact source commit for every advertised platform and architecture,
+  and retain the workflow URL as release evidence.
 - Use application API credentials registered for this distribution. Test-only
   credentials and another application's credentials are not a release setup.
-- Confirm redistribution terms for all bundled assets, including the translation
-  snapshot from `AyuGram/Languages`, and retain author attribution.
-- Sign public macOS packages with the publisher's Developer ID, notarize them
-  and verify Gatekeeper acceptance. The current workflow's ad-hoc signature only
-  checks package integrity; it is not publisher authentication or notarization.
+- Do not bundle external translation snapshots. AyuGram translations are fetched
+  by the application and cached locally.
+- Verify the macOS ad-hoc signature and Windows Authenticode status, and state
+  clearly that technical packages are not publisher-signed or notarized.
 - Establish an authenticated update channel with its publisher, signing keys,
   version policy and supported platform IDs. Verify a real upgrade and rejection
   of altered or wrong-channel packages before enabling automatic installation.
 - Publish checksums, exact source and pinned submodules with the binaries.
   Update the download instructions only when those binaries exist.
 
-Preview artifacts disable automatic updates explicitly. The source updater is
-retained, but must not be pointed at an unrelated publisher or enabled merely
-to expose an update button. There is no new signing service or public release
-channel configured by this branch.
+Technical release artifacts disable automatic updates explicitly. The source
+updater is retained, but must not be pointed at an unrelated publisher or
+enabled merely to expose an update button. There is no signed update channel in
+this fork.
 
 ## Profiles
 

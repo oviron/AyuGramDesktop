@@ -1,0 +1,427 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REPO_NAME: AyuGramDesktop
+  VERSION: 7.2.5
+
+jobs:
+  validate:
+    name: Validate release head
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Match source version and release ref
+        run: |
+          test "$GITHUB_REF" = refs/heads/codex/ayu-7.2.5
+          test "$(awk '$1 == "AppVersionStr" { print $2 }' Telegram/build/version)" = "$VERSION"
+          test "$(awk '$1 == "AppVersionOriginal" { print $2 }' Telegram/build/version)" = "$VERSION"
+          test "$(awk '$1 == "BetaChannel" { print $2 }' Telegram/build/version)" = 0
+          test "$(awk '$1 == "AlphaVersion" { print $2 }' Telegram/build/version)" = 0
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git ls-remote --tags origin "refs/tags/v$VERSION")"
+          test ! -d Telegram/Resources/ayu/languages
+
+  source:
+    name: Full source archive
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Archive source and pinned submodules
+        run: |
+          root="AyuGramDesktop-$VERSION"
+          archive="$RUNNER_TEMP/$root-full.tar"
+          git archive --format=tar --prefix="$root/" HEAD -o "$archive"
+          while read -r revision path rest; do
+            revision="${revision#[-+U]}"
+            test "$(git -C "$path" rev-parse HEAD)" = "$revision"
+            part="$RUNNER_TEMP/submodule-$(printf '%s' "$path" | sha256sum | cut -c1-16).tar"
+            git -C "$path" archive --format=tar --prefix="$root/$path/" "$revision" -o "$part"
+            tar --concatenate --file="$archive" "$part"
+          done < <(git submodule status --recursive)
+          gzip -9 -n "$archive"
+          mkdir artifacts
+          mv "$archive.gz" "artifacts/AyuGramDesktop-$VERSION-full.tar.gz"
+          tar -tzf "artifacts/AyuGramDesktop-$VERSION-full.tar.gz" > "$RUNNER_TEMP/source-files.txt"
+          grep -qx "$root/Telegram/build/version" "$RUNNER_TEMP/source-files.txt"
+          ! grep -q "$root/Telegram/Resources/ayu/languages/" "$RUNNER_TEMP/source-files.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-source-${{ github.sha }}
+          path: artifacts/AyuGramDesktop-7.2.5-full.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  macos:
+    name: macOS universal Release
+    needs: validate
+    runs-on: macos-15
+    timeout-minutes: 350
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      CCACHE_DIR: ${{ github.workspace }}/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: pch_defines,time_macros
+      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
+      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+    steps:
+      - name: Validate application credentials
+        run: |
+          if [[ ! "$TDESKTOP_API_ID" =~ ^[1-9][0-9]*$ || ! "$TDESKTOP_API_HASH" =~ ^[[:xdigit:]]{32}$ ]]; then
+            echo 'Set TDESKTOP_API_ID and TDESKTOP_API_HASH in repository Actions settings.' >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+          persist-credentials: false
+      - name: Install build tools
+        id: toolchain
+        run: |
+          brew install automake libtool meson nasm ninja pkg-config ccache
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          toolchain_id=$( { xcodebuild -version; xcrun --sdk macosx --show-sdk-version; cmake --version; } | shasum -a 256 | cut -c1-16)
+          echo "id=$toolchain_id" >> "$GITHUB_OUTPUT"
+      - name: Restore libraries cache
+        id: libraries-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: macos-universal-release-${{ steps.toolchain.outputs.id }}-${{ hashFiles('AyuGramDesktop/Telegram/build/prepare/**', 'AyuGramDesktop/Telegram/build/qt_version.py') }}
+          restore-keys: macos-universal-release-${{ steps.toolchain.outputs.id }}-
+      - name: Prepare libraries
+        run: ./${{ env.REPO_NAME }}/Telegram/build/prepare/mac.sh silent qt-release-only
+      - name: Prune libraries
+        run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
+      - name: Save libraries cache
+        if: steps.libraries-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: ${{ steps.libraries-cache.outputs.cache-primary-key }}
+      - name: Restore compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-macos-universal-release-${{ steps.toolchain.outputs.id }}-${{ github.sha }}
+          restore-keys: ccache-macos-universal-release-${{ steps.toolchain.outputs.id }}-
+      - name: Configure Release
+        working-directory: ${{ env.REPO_NAME }}/Telegram
+        run: |
+          ./configure.sh -G Ninja \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -D 'CMAKE_OSX_ARCHITECTURES=x86_64;arm64' \
+            -D DESKTOP_APP_MAC_ARCH= \
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_OBJC_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
+            -D 'CMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
+            -D 'CMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
+            -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
+            -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          python3 build/check_macos_release.py ../out \
+            --architectures x86_64 arm64 --disable-autoupdate
+      - name: Build AyuGram
+        working-directory: ${{ env.REPO_NAME }}
+        run: |
+          cmake --build out --parallel 3 --target Telegram
+          ccache --show-stats
+      - name: Save compiler cache
+        if: always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - name: Verify app and create DMG
+        working-directory: ${{ env.REPO_NAME }}/out
+        run: |
+          app=AyuGram.app
+          test -s "$app/Contents/MacOS/AyuGram"
+          test -s "$app/Contents/Resources/Telegram.rcc"
+          test -s "$app/Contents/Resources/AppIcon-Default.icns"
+          test "$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = one.ayugram.AyuGramDesktop
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$VERSION"
+          test "$(plutil -extract CFBundleVersion raw -o - "$app/Contents/Info.plist")" = "$VERSION"
+          icon_name=$(plutil -extract CFBundleIconFile raw -o - "$app/Contents/Info.plist")
+          test -s "$app/Contents/Resources/$icon_name"
+          test ! -e "$app/Contents/Frameworks/Updater"
+          /usr/bin/strip -S "$app/Contents/MacOS/AyuGram"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app"
+          mkdir -p dmg artifacts
+          ditto "$app" dmg/AyuGram.app
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname AyuGram -srcfolder dmg -ov -format UDZO artifacts/AyuGram.dmg
+          mkdir "$RUNNER_TEMP/ayugram-mount"
+          device=$(hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/ayugram-mount" artifacts/AyuGram.dmg | awk 'NR == 1 { print $1 }')
+          trap 'hdiutil detach "$device"' EXIT
+          test -s "$RUNNER_TEMP/ayugram-mount/AyuGram.app/Contents/MacOS/AyuGram"
+          codesign --verify --deep --strict "$RUNNER_TEMP/ayugram-mount/AyuGram.app"
+          test "$(lipo -archs "$RUNNER_TEMP/ayugram-mount/AyuGram.app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '
+          hdiutil detach "$device"
+          trap - EXIT
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-macos-${{ github.sha }}
+          path: ${{ env.REPO_NAME }}/out/artifacts/AyuGram.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  windows:
+    name: Windows x64 Release
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 350
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
+      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+    steps:
+      - name: Validate application credentials
+        run: |
+          if ($env:TDESKTOP_API_ID -notmatch '^[1-9][0-9]*$' -or $env:TDESKTOP_API_HASH -notmatch '^[0-9a-fA-F]{32}$') {
+            throw 'Set TDESKTOP_API_ID and TDESKTOP_API_HASH in repository Actions settings.'
+          }
+      - name: Prepare directories
+        run: |
+          $build = Join-Path $env:USERPROFILE 'TBuild'
+          New-Item -ItemType Directory -Force (Join-Path $build 'Libraries\win64') | Out-Null
+          New-Item -ItemType Junction -Path (Join-Path $env:GITHUB_WORKSPACE 'TBuild') -Target $build | Out-Null
+          "TBUILD=$(Join-Path $env:GITHUB_WORKSPACE 'TBuild')" | Out-File $env:GITHUB_ENV -Append
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+          persist-credentials: false
+      - name: Read toolchain and cache key
+        shell: bash
+        run: |
+          doc="$TBUILD/$REPO_NAME/docs/building-win.md"
+          sdk=$(sed -n 's/.*\*\*\([^*]*\)\*\* SDK version.*/\1/p' "$doc" | head -1)
+          test -n "$sdk"
+          key=$( { sha256sum "$TBUILD/$REPO_NAME/Telegram/build/prepare/prepare.py"; printf '%s\n' "$sdk"; } | sha256sum | cut -d' ' -f1)
+          echo "SDK=$sdk" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=$key" >> "$GITHUB_ENV"
+      - name: Install Visual Studio ATL component
+        run: |
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $vswhere = Join-Path $installer 'vswhere.exe'
+          $setup = Join-Path $installer 'setup.exe'
+          $toolsComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
+          $atlComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL'
+          $path = @(& $vswhere -latest -products '*' -requires $toolsComponent -property installationPath)[0]
+          if (-not $path) { throw "No Visual Studio instance provides $toolsComponent." }
+          $toolset = Get-ChildItem (Join-Path $path 'VC\Tools\MSVC') -Directory |
+            Where-Object { $_.Name -like '14.44.*' } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          $header = Join-Path $toolset.FullName 'atlmfc\include\atlbase.h'
+          if (-not (Test-Path $header)) {
+            $process = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+              'modify', '--installPath', "`"$path`"", '--add', $atlComponent,
+              '--quiet', '--norestart', '--nocache')
+            if ($process.ExitCode -notin @(0, 3010)) { exit $process.ExitCode }
+          }
+          if (-not (Test-Path $header)) { throw "ATL was not installed at $header." }
+      - name: Native Tools Command Prompt
+        uses: Eden-CI/msvc-dev-cmd@1bd71f95d6f3d1b2b3395b335cc63bcdc90cf223
+        with:
+          arch: x64
+          sdk: ${{ env.SDK }}
+          toolset: '14.44'
+      - name: Restore ThirdParty cache
+        id: third-party-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: windows-x64-third-party-${{ env.CACHE_KEY }}
+          restore-keys: windows-x64-third-party-
+      - name: Restore libraries cache
+        id: libraries-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\Libraries\win64
+          key: windows-x64-release-libraries-${{ env.CACHE_KEY }}
+          restore-keys: windows-x64-release-libraries-
+      - name: Prepare libraries
+        shell: cmd
+        run: call %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent
+      - name: Prune libraries
+        shell: bash
+        run: find "$TBUILD/Libraries/win64" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+      - name: Save ThirdParty cache
+        if: steps.third-party-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: ${{ steps.third-party-cache.outputs.cache-primary-key }}
+      - name: Save libraries cache
+        if: steps.libraries-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\Libraries\win64
+          key: ${{ steps.libraries-cache.outputs.cache-primary-key }}
+      - name: Configure Release
+        shell: cmd
+        run: |
+          cd /d %TBUILD%\%REPO_NAME%\Telegram
+          call configure.bat x64 -G "Ninja Multi-Config" ^
+            -D CMAKE_CONFIGURATION_TYPES=Release ^
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
+            -D "TDESKTOP_API_ID=%TDESKTOP_API_ID%" ^
+            -D "TDESKTOP_API_HASH=%TDESKTOP_API_HASH%" ^
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+      - name: Verify Release configuration
+        run: |
+          $out = Join-Path $env:TBUILD "$env:REPO_NAME\out"
+          $cache = Get-Content (Join-Path $out 'CMakeCache.txt') -Raw
+          if ($cache -notmatch '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=Release$') { throw 'Not a Release-only build.' }
+          if ($cache -notmatch '(?m)^DESKTOP_APP_DISABLE_AUTOUPDATE:BOOL=ON$') { throw 'Updater is enabled.' }
+          $commands = Get-Content (Join-Path $out 'compile_commands.json') -Raw
+          if ($commands -notmatch 'Telegram[/\\]SourceFiles' -or $commands -notmatch '(/O2|-O2)' -or $commands -notmatch 'NDEBUG') {
+            throw 'Release compilation flags were not generated.'
+          }
+      - name: Build AyuGram
+        shell: cmd
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --parallel --target Telegram
+      - name: Verify and package Windows artifacts
+        run: |
+          $repo = Join-Path $env:TBUILD $env:REPO_NAME
+          $out = Join-Path $repo 'out\Release'
+          $binary = Join-Path $out 'AyuGram.exe'
+          if (-not (Test-Path $binary)) { throw 'AyuGram.exe was not built.' }
+          if (Test-Path (Join-Path $out 'Updater.exe')) { throw 'Updater.exe must not be built.' }
+          $stream = [IO.File]::OpenRead($binary)
+          try {
+            $reader = [IO.BinaryReader]::new($stream)
+            $stream.Position = 0x3c
+            $pe = $reader.ReadInt32()
+            $stream.Position = $pe + 4
+            $machine = $reader.ReadUInt16()
+          } finally {
+            $stream.Dispose()
+          }
+          if ($machine -ne 0x8664) { throw "Unexpected PE machine: 0x$($machine.ToString('x4'))." }
+          $version = (Get-Item $binary).VersionInfo.ProductVersion
+          if ($version -ne "$env:VERSION.0") { throw "Unexpected product version: $version." }
+          $signature = Get-AuthenticodeSignature $binary
+          if ($signature.Status -ne 'NotSigned') { throw "Unexpected application signature status: $($signature.Status)." }
+          $d3d = Join-Path $out 'modules\x64\d3d\d3dcompiler_47.dll'
+          if (-not (Test-Path $d3d)) { throw 'D3D compiler module is missing.' }
+          if (-not (Test-Path (Join-Path $repo 'Telegram\Resources\art\icon256.ico'))) { throw 'Windows application icon is missing.' }
+          choco install innosetup --no-progress -y
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc "/dMyAppVersion=$env:VERSION" "/dMyAppVersionZero=$env:VERSION" "/dMyAppVersionFull=$env:VERSION" "/dReleasePath=$out" '/dMyBuildTarget=win64' '/dAyuGramUnsigned=1' '/dAyuGramNoUpdater=1' (Join-Path $repo 'Telegram\build\setup.iss')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $setup = Join-Path $out "ayusetup-x64.$env:VERSION.exe"
+          if (-not (Test-Path $setup)) { throw 'Installer was not created.' }
+          if ((Get-AuthenticodeSignature $setup).Status -ne 'NotSigned') { throw 'Unexpected installer signature.' }
+          $artifacts = Join-Path $repo 'artifacts'
+          New-Item -ItemType Directory -Force $artifacts | Out-Null
+          Copy-Item $setup (Join-Path $artifacts 'AyuGram.exe')
+          $portable = Join-Path $env:RUNNER_TEMP 'AyuGram'
+          New-Item -ItemType Directory -Force (Join-Path $portable 'TelegramForcePortable') | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $portable 'modules\x64\d3d') | Out-Null
+          Copy-Item $binary (Join-Path $portable 'AyuGram.exe')
+          Copy-Item $d3d (Join-Path $portable 'modules\x64\d3d\d3dcompiler_47.dll')
+          & 7z a -mx9 (Join-Path $artifacts 'AyuGram.zip') $portable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & 7z t (Join-Path $artifacts 'AyuGram.zip')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $install = Join-Path $env:RUNNER_TEMP 'installed-AyuGram'
+          $process = Start-Process (Join-Path $artifacts 'AyuGram.exe') -Wait -PassThru -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$install")
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+          if (-not (Test-Path (Join-Path $install 'AyuGram.exe'))) { throw 'Installed application is missing.' }
+          if (Test-Path (Join-Path $install 'Updater.exe')) { throw 'Installer included the updater.' }
+          if (-not (Test-Path (Join-Path $install 'modules\x64\d3d\d3dcompiler_47.dll'))) { throw 'Installer omitted the D3D module.' }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-${{ github.sha }}
+          path: |
+            ${{ env.TBUILD }}\${{ env.REPO_NAME }}\artifacts\AyuGram.exe
+            ${{ env.TBUILD }}\${{ env.REPO_NAME }}\artifacts\AyuGram.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: [source, macos, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*-${{ github.sha }}
+          path: release
+          merge-multiple: true
+      - name: Verify files and checksums
+        run: |
+          cd release
+          expected=(AyuGram.dmg AyuGram.exe AyuGram.zip "AyuGramDesktop-$VERSION-full.tar.gz")
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 4
+          for file in "${expected[@]}"; do test -s "$file"; done
+          sha256sum "${expected[@]}" > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+      - name: Publish exact-head release
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Technical maintenance build of AyuGram 7.2.5 from commit \`$GITHUB_SHA\`.
+
+          - \`AyuGram.dmg\`: universal macOS application (Apple Silicon and Intel)
+          - \`AyuGram.exe\`: Windows x64 installer
+          - \`AyuGram.zip\`: Windows x64 portable application
+          - \`AyuGramDesktop-$VERSION-full.tar.gz\`: source with pinned submodules
+
+          Automatic updates are disabled. The macOS application has an ad-hoc
+          integrity signature and is not notarized. Windows binaries are not
+          Authenticode-signed. Verify downloads with \`SHA256SUMS.txt\`.
+          EOF
+          gh release create "v$VERSION" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AyuGram $VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --latest

@@ -137,10 +137,11 @@ jobs:
         working-directory: ${{ env.REPO_NAME }}/Telegram
         run: |
           mkdir -p ../mac-apps
+          export CMAKE_BUILD_TYPE=Release
           for architecture in arm64 x86_64; do
             rm -rf ../out
             ./configure.sh -G Ninja \
-              -D CMAKE_BUILD_TYPE=Release \
+              -DCMAKE_BUILD_TYPE=Release \
               -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
               -D "CMAKE_OSX_ARCHITECTURES=$architecture" \
               -D "DESKTOP_APP_MAC_ARCH=$architecture" \
@@ -334,9 +335,12 @@ jobs:
       - name: Verify Release configuration
         run: |
           $out = Join-Path $env:TBUILD "$env:REPO_NAME\out"
-          $cache = Get-Content (Join-Path $out 'CMakeCache.txt') -Raw
-          if ($cache -notmatch '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=Release$') { throw 'Not a Release-only build.' }
-          if ($cache -notmatch '(?m)^DESKTOP_APP_DISABLE_AUTOUPDATE:BOOL=ON$') { throw 'Updater is enabled.' }
+          $cache = @{}
+          Get-Content (Join-Path $out 'CMakeCache.txt') | ForEach-Object {
+            if ($_ -match '^([^:#/][^:=]*):[^=]+=(.*)$') { $cache[$Matches[1]] = $Matches[2] }
+          }
+          if ($cache['CMAKE_CONFIGURATION_TYPES'] -ne 'Release') { throw 'Not a Release-only build.' }
+          if ($cache['DESKTOP_APP_DISABLE_AUTOUPDATE'] -ne 'ON') { throw 'Updater is enabled.' }
           $commands = Get-Content (Join-Path $out 'compile_commands.json') -Raw
           if ($commands -notmatch 'Telegram[/\\]SourceFiles' -or $commands -notmatch '(/O2|-O2)' -or $commands -notmatch 'NDEBUG') {
             throw 'Release compilation flags were not generated.'

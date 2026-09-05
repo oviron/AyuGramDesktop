@@ -30,7 +30,7 @@ For a local single-architecture Release build:
 ./Telegram/build/prepare/mac.sh silent qt-release-only
 cd Telegram
 ./configure.sh -G Ninja \
-  -D CMAKE_BUILD_TYPE=Release \
+  -DCMAKE_BUILD_TYPE=Release \
   -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -D CMAKE_OSX_ARCHITECTURES=arm64 \
   -D DESKTOP_APP_MAC_ARCH=arm64 \

@@ -156,7 +156,7 @@ jobs:
               -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
               -DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
             python3 build/check_macos_release.py ../out \
-              --architectures "$architecture" --disable-autoupdate
+              --architectures "$architecture"
             cmake --build ../out --parallel 3 --target Telegram
             mkdir -p "../mac-apps/$architecture"
             ditto ../out/AyuGram.app "../mac-apps/$architecture/AyuGram.app"

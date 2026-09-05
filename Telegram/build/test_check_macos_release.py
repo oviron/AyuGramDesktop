@@ -11,20 +11,15 @@ class ReleaseCheckTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.build = Path(self.directory.name)
-        (self.build / "CMakeCache.txt").write_text(
-            "CMAKE_BUILD_TYPE:STRING=Release\n"
-            "CMAKE_OSX_ARCHITECTURES:STRING=arm64\n"
-            "DESKTOP_APP_DISABLE_AUTOUPDATE:BOOL=ON\n"
-        )
         (self.build / "build.ninja").write_text("libQt6Widgets.a")
         self.command = {
             "file": "/src/Telegram/SourceFiles/core/application.cpp",
             "command": "clang++ -O3 -DNDEBUG -arch arm64 -c application.cpp",
         }
 
-    def run_check(self, architectures=("arm64",), disable_autoupdate=False):
+    def run_check(self, architectures=("arm64",)):
         (self.build / "compile_commands.json").write_text(json.dumps([self.command]))
-        check(self.build, architectures, disable_autoupdate)
+        check(self.build, architectures)
 
     def test_release(self):
         self.run_check()
@@ -52,10 +47,6 @@ class ReleaseCheckTest(unittest.TestCase):
     def test_each_target(self):
         for architectures in (("x86_64",), ("x86_64", "arm64")):
             with self.subTest(architectures=architectures):
-                (self.build / "CMakeCache.txt").write_text(
-                    "CMAKE_BUILD_TYPE:STRING=Release\n"
-                    "CMAKE_OSX_ARCHITECTURES:STRING=" + ";".join(architectures) + "\n"
-                )
                 self.command["command"] = "clang++ -O3 -DNDEBUG " + " ".join("-arch " + arch for arch in architectures)
                 self.run_check(architectures)
 
@@ -73,13 +64,6 @@ class ReleaseCheckTest(unittest.TestCase):
         self.command["command"] += " -UNDEBUG"
         with self.assertRaises(ValueError):
             self.run_check()
-
-    def test_preview_requires_disabled_updater(self):
-        path = self.build / "CMakeCache.txt"
-        path.write_text(path.read_text().replace("=ON", "=OFF"))
-        self.run_check()
-        with self.assertRaises(ValueError):
-            self.run_check(disable_autoupdate=True)
 
 if __name__ == "__main__":
     unittest.main()

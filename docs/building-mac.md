@@ -40,7 +40,7 @@ cd Telegram
   "-DTDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
   -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON
 python3 build/check_macos_release.py ../out \
-  --architectures arm64 --disable-autoupdate
+  --architectures arm64
 cmake --build ../out --parallel 3 --target Telegram
 ```
 

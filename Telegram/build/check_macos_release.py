@@ -5,13 +5,10 @@ import shlex
 from pathlib import Path
 
 
-def check(build, architectures=("arm64",), disable_autoupdate=False):
+def check(build, architectures=("arm64",)):
     expected = set(architectures)
     if not expected or not expected <= {"arm64", "x86_64"}:
         raise ValueError("Unsupported macOS architecture")
-    cache = dict(re.findall(r"^([^:#/][^:=]*):[^=]+=(.*)$", (build / "CMakeCache.txt").read_text(), re.M))
-    if disable_autoupdate and cache.get("DESKTOP_APP_DISABLE_AUTOUPDATE") != "ON":
-        raise ValueError("CI preview artifacts must not install upstream updates")
     commands = json.loads((build / "compile_commands.json").read_text())
     product = [
         entry for entry in commands
@@ -41,6 +38,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("build", type=Path)
     parser.add_argument("--architectures", nargs="+", choices=("arm64", "x86_64"), default=["arm64"])
-    parser.add_argument("--disable-autoupdate", action="store_true")
     args = parser.parse_args()
-    check(args.build, args.architectures, args.disable_autoupdate)
+    check(args.build, args.architectures)

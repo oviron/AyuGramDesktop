@@ -33,7 +33,6 @@ cd Telegram
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
   "-DCMAKE_Swift_FLAGS=-target arm64-apple-macos11.0" \
   -DDESKTOP_APP_MAC_ARCH=arm64 \
   -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -51,7 +50,8 @@ see [release requirements](releasing.md).
 
 Append `mac-arm64` to preparation when only Apple Silicon dependencies are
 needed. For Intel only, use `mac-x86_64` and `x86_64` instead. Do not configure
-a single CMake tree with both architectures while Swift translation is enabled.
+a single CMake tree with both architectures while Swift translation is enabled;
+use `x86_64-apple-macos10.13` for the Intel Swift target.
 Other dependencies retain their upstream universal build recipes.
 
 ## Debug and Xcode development

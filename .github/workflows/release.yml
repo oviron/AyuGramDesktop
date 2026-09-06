@@ -139,13 +139,17 @@ jobs:
           mkdir -p ../mac-apps
           export CMAKE_BUILD_TYPE=Release
           for architecture in arm64 x86_64; do
+            if [[ "$architecture" == arm64 ]]; then
+              swift_target=arm64-apple-macos11.0
+            else
+              swift_target=x86_64-apple-macos10.13
+            fi
             rm -rf ../out
             ./configure.sh -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               "-DCMAKE_OSX_ARCHITECTURES=$architecture" \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-              "-DCMAKE_Swift_FLAGS=-target $architecture-apple-macos11.0" \
+              "-DCMAKE_Swift_FLAGS=-target $swift_target" \
               "-DDESKTOP_APP_MAC_ARCH=$architecture" \
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -213,7 +217,7 @@ jobs:
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
           test "$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '
           vtool -show-build -arch arm64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 11.0'
-          vtool -show-build -arch x86_64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 11.0'
+          vtool -show-build -arch x86_64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 10.13'
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = one.ayugram.AyuGramDesktop
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$VERSION"
           test "$(plutil -extract CFBundleVersion raw -o - "$app/Contents/Info.plist")" = "$VERSION"

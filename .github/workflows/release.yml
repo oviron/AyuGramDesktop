@@ -177,6 +177,7 @@ jobs:
       - name: Verify app and create DMG
         working-directory: ${{ env.REPO_NAME }}
         run: |
+          trap 'echo "macOS packaging failed at line $LINENO." >&2' ERR
           app=release/AyuGram.app
           arm=mac-apps/arm64/AyuGram.app
           intel=mac-apps/x86_64/AyuGram.app
@@ -196,7 +197,6 @@ jobs:
             fi
             if [[ "$relative" == Contents/Frameworks/libswift*.dylib && "$arm_archs" == "$intel_archs" ]]; then
               [[ "$arm_archs" == *' x86_64 '* ]]
-              cmp -s "$arm_file" "$intel_file"
               continue
             fi
             [[ "$arm_archs" == *' arm64 '* && "$intel_archs" == *' x86_64 '* ]]

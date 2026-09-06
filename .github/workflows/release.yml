@@ -144,6 +144,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               "-DCMAKE_OSX_ARCHITECTURES=$architecture" \
+              "-DCMAKE_Swift_FLAGS=-target $architecture-apple-macos11.0" \
               "-DDESKTOP_APP_MAC_ARCH=$architecture" \
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -191,6 +192,11 @@ jobs:
             [[ "$arm_archs" == *' arm64 '* && "$intel_archs" == *' x86_64 '* ]]
             lipo -create "$arm_file" "$intel_file" -output "$output"
           done < <(find "$arm" -type f -print0)
+          while IFS= read -r -d '' output_file; do
+            if ! file "$output_file" | grep -q 'Mach-O'; then continue; fi
+            output_archs=" $(lipo -archs "$output_file") "
+            [[ "$output_archs" == *' arm64 '* && "$output_archs" == *' x86_64 '* ]]
+          done < <(find "$app" -type f -print0)
           test -s "$app/Contents/MacOS/AyuGram"
           test -s "$app/Contents/Resources/Telegram.rcc"
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
@@ -328,6 +334,7 @@ jobs:
           call configure.bat -G "Ninja Multi-Config" ^
             -D CMAKE_CONFIGURATION_TYPES=Release ^
             -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
+            "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=" ^
             -D "TDESKTOP_API_ID=%TDESKTOP_API_ID%" ^
             -D "TDESKTOP_API_HASH=%TDESKTOP_API_HASH%" ^
             -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
@@ -345,6 +352,7 @@ jobs:
           if ($commands -notmatch 'Telegram[/\\]SourceFiles' -or $commands -notmatch '(/O2|-O2)' -or $commands -notmatch 'NDEBUG') {
             throw 'Release compilation flags were not generated.'
           }
+          if ($commands -match ' /Z(7|i) ') { throw 'Release objects include debug information.' }
       - name: Build AyuGram
         shell: cmd
         run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --parallel --target Telegram

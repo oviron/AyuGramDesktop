@@ -254,7 +254,8 @@ jobs:
           ln -s /Applications dmg/Applications
           hdiutil create -volname AyuGram -srcfolder dmg -ov -format UDZO artifacts/AyuGram.dmg
           mkdir "$RUNNER_TEMP/ayugram-mount"
-          device=$(hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/ayugram-mount" artifacts/AyuGram.dmg | awk 'NR == 1 { print $1 }')
+          device=$(hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/ayugram-mount" artifacts/AyuGram.dmg | awk '/^\/dev\// { print $1; exit }')
+          test -n "$device"
           trap 'hdiutil detach "$device"' EXIT
           test -s "$RUNNER_TEMP/ayugram-mount/AyuGram.app/Contents/MacOS/AyuGram"
           codesign --verify --deep --strict "$RUNNER_TEMP/ayugram-mount/AyuGram.app"

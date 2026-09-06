@@ -17,6 +17,10 @@ packages plus the full recursive source archive. Dependencies and compiler
 results use separate caches. The workflow creates the tag and public GitHub
 Release only after every build and package check succeeds.
 
+The default `all` component is the only mode that publishes a release. Select a
+single component only to diagnose its release build without repeating the other
+expensive jobs.
+
 Set the repository variable `TDESKTOP_API_ID` and secret `TDESKTOP_API_HASH` to
 credentials obtained for the application through
 [Telegram](https://core.telegram.org/api/obtaining_api_id). Missing credentials

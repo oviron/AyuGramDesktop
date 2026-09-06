@@ -2,6 +2,12 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      component:
+        description: Build all release artifacts or one diagnostic component
+        type: choice
+        default: all
+        options: [all, macos, windows, source]
 
 permissions:
   contents: read
@@ -38,6 +44,7 @@ jobs:
   source:
     name: Full source archive
     needs: validate
+    if: inputs.component == 'all' || inputs.component == 'source'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -75,6 +82,7 @@ jobs:
   macos:
     name: macOS universal Release
     needs: validate
+    if: inputs.component == 'all' || inputs.component == 'macos'
     runs-on: macos-15
     timeout-minutes: 350
     env:
@@ -196,7 +204,10 @@ jobs:
               continue
             fi
             if [[ "$relative" == Contents/Frameworks/libswift*.dylib && "$arm_archs" == "$intel_archs" ]]; then
-              [[ "$arm_archs" == *' x86_64 '* ]]
+              if [[ "$arm_archs" != *' x86_64 '* ]]; then
+                echo "Unsupported matching Swift fallback architectures for $relative:$arm_archs" >&2
+                exit 1
+              fi
               continue
             fi
             [[ "$arm_archs" == *' arm64 '* && "$intel_archs" == *' x86_64 '* ]]
@@ -207,7 +218,10 @@ jobs:
             relative=${output_file#"$app/"}
             output_archs=" $(lipo -archs "$output_file") "
             if [[ "$relative" == Contents/Frameworks/libswift*.dylib ]]; then
-              [[ "$output_archs" == *' x86_64 '* ]]
+              if [[ "$output_archs" != *' x86_64 '* ]]; then
+                echo "Swift fallback $relative has unsupported architectures:$output_archs" >&2
+                exit 1
+              fi
               continue
             fi
             [[ "$output_archs" == *' arm64 '* && "$output_archs" == *' x86_64 '* ]]
@@ -251,6 +265,7 @@ jobs:
   windows:
     name: Windows x64 Release
     needs: validate
+    if: inputs.component == 'all' || inputs.component == 'windows'
     runs-on: windows-latest
     timeout-minutes: 350
     defaults:
@@ -436,6 +451,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [source, macos, windows]
+    if: inputs.component == 'all'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

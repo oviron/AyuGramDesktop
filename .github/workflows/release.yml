@@ -192,6 +192,11 @@ jobs:
           rm -rf release dmg artifacts
           mkdir -p release
           ditto "$arm" "$app"
+          if [[ ! -s "$app/Contents/MacOS/AyuGram" ]]; then
+            echo 'AyuGram executable is missing after copying the arm64 bundle.' >&2
+            find "$app/Contents" -maxdepth 3 -print >&2
+            exit 1
+          fi
           while IFS= read -r -d '' arm_file; do
             if ! file "$arm_file" | grep -q 'Mach-O'; then continue; fi
             relative=${arm_file#"$arm/"}
@@ -226,7 +231,11 @@ jobs:
             fi
             [[ "$output_archs" == *' arm64 '* && "$output_archs" == *' x86_64 '* ]]
           done < <(find "$app" -type f -print0)
-          test -s "$app/Contents/MacOS/AyuGram"
+          if [[ ! -s "$app/Contents/MacOS/AyuGram" ]]; then
+            echo 'AyuGram executable is missing after merging the bundles.' >&2
+            find "$app/Contents" -maxdepth 3 -print >&2
+            exit 1
+          fi
           test -s "$app/Contents/Resources/Telegram.rcc"
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
           test "$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '

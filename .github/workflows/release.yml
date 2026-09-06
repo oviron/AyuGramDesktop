@@ -144,6 +144,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               "-DCMAKE_OSX_ARCHITECTURES=$architecture" \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
               "-DCMAKE_Swift_FLAGS=-target $architecture-apple-macos11.0" \
               "-DDESKTOP_APP_MAC_ARCH=$architecture" \
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -189,18 +190,30 @@ jobs:
             if [[ "$arm_archs" == *' arm64 '* && "$arm_archs" == *' x86_64 '* ]]; then
               continue
             fi
+            if [[ "$relative" == Contents/Frameworks/libswift*.dylib && "$arm_archs" == "$intel_archs" ]]; then
+              [[ "$arm_archs" == *' x86_64 '* ]]
+              cmp -s "$arm_file" "$intel_file"
+              continue
+            fi
             [[ "$arm_archs" == *' arm64 '* && "$intel_archs" == *' x86_64 '* ]]
             lipo -create "$arm_file" "$intel_file" -output "$output"
           done < <(find "$arm" -type f -print0)
           while IFS= read -r -d '' output_file; do
             if ! file "$output_file" | grep -q 'Mach-O'; then continue; fi
+            relative=${output_file#"$app/"}
             output_archs=" $(lipo -archs "$output_file") "
+            if [[ "$relative" == Contents/Frameworks/libswift*.dylib ]]; then
+              [[ "$output_archs" == *' x86_64 '* ]]
+              continue
+            fi
             [[ "$output_archs" == *' arm64 '* && "$output_archs" == *' x86_64 '* ]]
           done < <(find "$app" -type f -print0)
           test -s "$app/Contents/MacOS/AyuGram"
           test -s "$app/Contents/Resources/Telegram.rcc"
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
           test "$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '
+          vtool -show-build -arch arm64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 11.0'
+          vtool -show-build -arch x86_64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 11.0'
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = one.ayugram.AyuGramDesktop
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$VERSION"
           test "$(plutil -extract CFBundleVersion raw -o - "$app/Contents/Info.plist")" = "$VERSION"

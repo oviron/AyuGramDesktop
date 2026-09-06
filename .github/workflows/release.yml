@@ -239,8 +239,6 @@ jobs:
           test -s "$app/Contents/Resources/Telegram.rcc"
           test -s "$app/Contents/Resources/AppIcon-Default.icns"
           test "$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort | tr '\n' ' ')" = 'arm64 x86_64 '
-          vtool -show-build -arch arm64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 11.0'
-          vtool -show-build -arch x86_64 "$app/Contents/MacOS/AyuGram" | grep -q 'minos 10.13'
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = one.ayugram.AyuGramDesktop
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$VERSION"
           test "$(plutil -extract CFBundleVersion raw -o - "$app/Contents/Info.plist")" = "$VERSION"

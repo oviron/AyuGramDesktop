@@ -72,10 +72,12 @@ work.
 
 ## Caches
 
-Cold, a release costs an hour or two per platform to prepare the dependencies
-and another two and a half to compile. Warm, the compile is minutes. Whether a
-platform job takes ten minutes or five hours is decided entirely by whether
-the six caches below were reachable and keyed correctly.
+Whether a release takes twenty-five minutes or four hours is decided entirely
+by whether the six caches below were reachable and keyed correctly. Measured
+on 7.2.8, the Windows job costs 4h03m with every cache cold and 24m with every
+cache warm; inside it, preparing the dependencies falls from 1h46m to under
+ten seconds and compiling from 2h01m to 11m25s. The macOS path costs about ten
+minutes warm, both architectures and the universal package included.
 
 | Key prefix | Holds |
 | --- | --- |
@@ -99,10 +101,11 @@ from the objects the failed run did produce.
 
 The Windows compiler cache is three gigabytes rather than two. A Release build
 compiles 2554 translation units, and in two gigabytes the cache filled to 98%
-and evicted its own entries while the build was still running: the next run
-hit on 74% of them instead of all, and compiled for twenty-eight minutes
-instead of the fifteen a full hit costs. macOS uses under one gigabyte for the
-same source, because its objects carry no MSVC debug records.
+and evicted its own entries while the build was still running. The cost was
+measured across four runs: at 74% hits the compile took 28m09s, at 86% 19m34s,
+and at 99%, which is what the whole set fitting in the cache buys, 11m26s. The
+full set occupies 2.2 GB. macOS uses under one gigabyte for the same source,
+because its objects carry no MSVC debug records.
 
 The Windows dependency keys hash the absolute build root along with
 `prepare.py` and the SDK version. `prepare.py` writes a per-stage key for

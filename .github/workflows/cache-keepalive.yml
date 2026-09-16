@@ -3,6 +3,10 @@ name: Cache keepalive
 # GitHub evicts a cache nothing has read for seven days, and the limit is not
 # raisable on a free account. Scheduled runs use the default branch, which is
 # the only scope every release branch can read.
+#
+# Every path below must be spelled exactly as the release workflow spells it:
+# the path is hashed into the cache entry's version, so a restore that writes
+# the same bytes to a differently written path misses and refreshes nothing.
 on:
   schedule:
     - cron: '0 5 * * 1,4'
@@ -30,12 +34,12 @@ jobs:
           restore-keys: macos-universal-release-
       - uses: actions/cache/restore@v6
         with:
-          path: ccache
+          path: ${{ github.workspace }}/ccache
           key: ccache-macos-arm64-release-
           restore-keys: ccache-macos-arm64-release-
       - uses: actions/cache/restore@v6
         with:
-          path: ccache
+          path: ${{ github.workspace }}/ccache
           key: ccache-macos-x86_64-release-
           restore-keys: ccache-macos-x86_64-release-
 
@@ -43,19 +47,21 @@ jobs:
     name: Windows caches
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      TBUILD: ${{ github.workspace }}\TBuild
     steps:
       - uses: actions/cache/restore@v6
         with:
-          path: TBuild\ThirdParty
+          path: ${{ env.TBUILD }}\ThirdParty
           key: windows-x64-third-party-
           restore-keys: windows-x64-third-party-
       - uses: actions/cache/restore@v6
         with:
-          path: TBuild\Libraries\win64
+          path: ${{ env.TBUILD }}\Libraries\win64
           key: windows-x64-release-libraries-
           restore-keys: windows-x64-release-libraries-
       - uses: actions/cache/restore@v6
         with:
-          path: TBuild\ccache
+          path: ${{ env.TBUILD }}\ccache
           key: ccache-windows-x64-release-
           restore-keys: ccache-windows-x64-release-

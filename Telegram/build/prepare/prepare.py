@@ -5,7 +5,7 @@ sys.dont_write_bytecode = True
 scriptPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scriptPath + '/..')
 import qt_version
-from macos_options import qt_options
+from qt_options import qt_options
 
 def finish(code):
     global executePath
@@ -82,11 +82,11 @@ for arg in sys.argv[1:]:
         runCommand.append('shell')
 
 try:
-    macQtConfiguration, macQtArchitectures = qt_options(options)
+    qtConfiguration, macQtArchitectures = qt_options(options)
 except ValueError as exception:
     error(str(exception))
-if not mac and any(option in options for option in ('qt-release-only', 'mac-arm64', 'mac-x86_64')):
-    error('macOS preparation options require macOS.')
+if not mac and any(option in options for option in ('mac-arm64', 'mac-x86_64')):
+    error('Architecture selection requires macOS.')
 
 if not os.path.isdir(os.path.join(libsDir, keysLoc)):
     pathlib.Path(os.path.join(libsDir, keysLoc)).mkdir(parents=True, exist_ok=True)
@@ -1572,10 +1572,7 @@ win:
     )
     cd ..
 
-    SET CONFIGURATIONS=-debug
-release:
-    SET CONFIGURATIONS=-debug-and-release
-win:
+    SET CONFIGURATIONS=""" + qtConfiguration + """
     """ + removeDir('"%LIBS_DIR%\\Qt-' + qt + '"') + """
     SET ANGLE_DIR=%LIBS_DIR%\\tg_angle
     SET ANGLE_LIBS_DIR=%ANGLE_DIR%\\out
@@ -1636,7 +1633,7 @@ mac:
     find $PWD/../patches/qtbase_$QT -type f -print0 | sort -z | xargs -0 git -C qtbase apply -v
     sed -i.bak 's/tqtc-//' {qtimageformats,qtsvg}/dependencies.yaml
 
-    CONFIGURATIONS=""" + macQtConfiguration + """
+    CONFIGURATIONS=""" + qtConfiguration + """
     ASSERTS=
 mac_asserts:
     ASSERTS=-force-asserts
@@ -1677,10 +1674,8 @@ win:
     )
     cd ..
 
-    SET CONFIGURATIONS=-debug
+    SET CONFIGURATIONS=""" + qtConfiguration + """
     SET ASSERTS=
-release:
-    SET CONFIGURATIONS=-debug-and-release
 win_asserts:
     SET ASSERTS=-force-asserts
 win:

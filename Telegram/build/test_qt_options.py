@@ -1,9 +1,9 @@
 import unittest
 
-from prepare.macos_options import qt_options
+from prepare.qt_options import qt_options
 
 
-class MacOptionsTest(unittest.TestCase):
+class QtOptionsTest(unittest.TestCase):
     def test_default_preserves_debug_release_and_intel(self):
         self.assertEqual(qt_options([]), ("-debug-and-release", "x86_64;arm64"))
 

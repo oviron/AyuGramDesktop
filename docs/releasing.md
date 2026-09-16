@@ -122,7 +122,10 @@ into. A build placed on `C:` gets through the compile and dies on the link,
 three hours in. The Windows job prints `df -h` into the log for this reason —
 the fuller report in the run summary cannot be read without a GitHub login.
 
-`Cache keepalive` runs twice a week and restores every key prefix. GitHub
+`Cache keepalive` runs twice a week and restores every key prefix, spelling
+each path exactly as the release workflow spells it. The path is hashed into
+the cache entry's version, so a keepalive that writes the same bytes to a
+differently written path misses every entry and refreshes nothing. GitHub
 evicts a cache nothing has read for seven days; since 2025-11-20 that window
 is configurable, but raising it requires a paid plan. Scheduled runs always
 use the default branch, which is both the scope the release needs and the only

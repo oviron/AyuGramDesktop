@@ -1,0 +1,61 @@
+name: Cache keepalive
+
+# GitHub evicts a cache nothing has read for seven days, and the limit is not
+# raisable on a free account. Scheduled runs use the default branch, which is
+# the only scope every release branch can read.
+on:
+  schedule:
+    - cron: '0 5 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cache-keepalive
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS caches
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: macos-universal-release-
+          restore-keys: macos-universal-release-
+      - uses: actions/cache/restore@v6
+        with:
+          path: ccache
+          key: ccache-macos-arm64-release-
+          restore-keys: ccache-macos-arm64-release-
+      - uses: actions/cache/restore@v6
+        with:
+          path: ccache
+          key: ccache-macos-x86_64-release-
+          restore-keys: ccache-macos-x86_64-release-
+
+  windows:
+    name: Windows caches
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/cache/restore@v6
+        with:
+          path: TBuild\ThirdParty
+          key: windows-x64-third-party-
+          restore-keys: windows-x64-third-party-
+      - uses: actions/cache/restore@v6
+        with:
+          path: TBuild\Libraries\win64
+          key: windows-x64-release-libraries-
+          restore-keys: windows-x64-release-libraries-
+      - uses: actions/cache/restore@v6
+        with:
+          path: TBuild\ccache
+          key: ccache-windows-x64-release-
+          restore-keys: ccache-windows-x64-release-

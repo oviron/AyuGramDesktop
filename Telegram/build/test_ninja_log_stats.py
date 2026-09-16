@@ -33,6 +33,16 @@ class TargetTest(unittest.TestCase):
     def test_output_without_target_directory(self):
         self.assertEqual(target_of("cmake_install.cmake"), "cmake_install.cmake")
 
+    def test_windows_separators(self):
+        self.assertEqual(target_of("Telegram\\CMakeFiles\\Telegram.dir\\Release\\main.cpp.obj"), "Telegram")
+
+    def test_windows_absolute_path(self):
+        output = "D:/a/AyuGramDesktop/TBuild/out/Telegram/CMakeFiles\\Telegram.dir\\Release\\main.cpp.obj"
+        self.assertEqual(target_of(output), "Telegram")
+
+    def test_absolute_path_without_target_directory(self):
+        self.assertEqual(target_of("D:/a/TBuild/out/Release/AyuGram.exe"), "Release")
+
 
 class SummaryTest(unittest.TestCase):
     def setUp(self):

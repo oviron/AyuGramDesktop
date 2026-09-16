@@ -86,12 +86,23 @@ the six caches below were reachable and keyed correctly.
 | `ccache-macos-x86_64-release-<commit>` | compiler cache |
 | `ccache-windows-x64-release-<commit>` | compiler cache |
 
-The release job writes every one of them and, once a save succeeds, deletes
-the older entries of the same prefix. A compiler cache key ends in the commit,
-so without that deletion each release would leave its predecessor behind and
-the repository would pass the ten gigabyte limit and start evicting the
-entries it just wrote. A failed build still saves its compiler cache, so a
-retry resumes from the objects the failed run did produce.
+The release job writes every one of them and deletes the entries its own save
+supersedes, because a compiler cache key ends in the commit and every release
+would otherwise leave its predecessor behind. The dependency caches are pruned
+after their save and the compiler caches before theirs, and the order is the
+whole point: three compiler caches coexisting with their predecessors comes to
+about eleven gigabytes, which passes the limit and evicts by least recent use,
+and the entry least recently used is a dependency tree that costs two hours to
+rebuild. Deleting first is safe only for a compiler cache, which one run
+refills. A failed build still saves its compiler cache, so a retry resumes
+from the objects the failed run did produce.
+
+The Windows compiler cache is three gigabytes rather than two. A Release build
+compiles 2554 translation units, and in two gigabytes the cache filled to 98%
+and evicted its own entries while the build was still running: the next run
+hit on 74% of them instead of all, and compiled for twenty-eight minutes
+instead of the fifteen a full hit costs. macOS uses under one gigabyte for the
+same source, because its objects carry no MSVC debug records.
 
 The Windows dependency keys hash the absolute build root along with
 `prepare.py` and the SDK version. `prepare.py` writes a per-stage key for

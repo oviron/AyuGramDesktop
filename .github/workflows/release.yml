@@ -256,6 +256,23 @@ jobs:
             echo
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Drop superseded compiler caches
+        # Matches the save below, so a failed build still replaces its cache.
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          KEEP: |
+            ${{ steps.compiler-cache.outputs.cache-primary-key }}
+          PREFIXES: ccache-macos-${{ matrix.architecture }}-release-
+        run: |
+          # Deleted before the save rather than after it: the two would
+          # otherwise coexist and the repository would pass the ten
+          # gigabyte limit, evicting a dependency tree that costs hours.
+          # Safe only for a compiler cache, which one run rebuilds.
+          for prefix in $PREFIXES; do
+            gh cache list --repo "$GITHUB_REPOSITORY" --key "$prefix" --limit 100 --json key --jq '.[].key' |
+              grep -vxF "$KEEP" | while read -r key; do gh cache delete --repo "$GITHUB_REPOSITORY" "$key"; done || true
+          done
       - name: Save compiler cache
         # Saved even when the build failed: a retry then resumes from the
         # objects this run did produce instead of recompiling everything.
@@ -264,19 +281,6 @@ jobs:
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
-      - name: Drop superseded compiler caches
-        continue-on-error: true
-        env:
-          KEEP: |
-            ${{ steps.compiler-cache.outputs.cache-primary-key }}
-          PREFIXES: ccache-macos-${{ matrix.architecture }}-release-
-        run: |
-          # Kept under ten gigabytes by deleting what each save superseded,
-          # right after that save rather than at the end of the job.
-          for prefix in $PREFIXES; do
-            gh cache list --repo "$GITHUB_REPOSITORY" --key "$prefix" --limit 100 --json key --jq '.[].key' |
-              grep -vxF "$KEEP" | while read -r key; do gh cache delete --repo "$GITHUB_REPOSITORY" "$key"; done || true
-          done
       - uses: actions/upload-artifact@v7
         with:
           name: macos-app-${{ matrix.architecture }}
@@ -407,7 +411,9 @@ jobs:
       SRC: ${{ github.workspace }}\TBuild\AyuGramDesktop
       CCACHE_DIR: ${{ github.workspace }}\TBuild\ccache
       CCACHE_DEPEND: 'true'
-      CCACHE_MAXSIZE: 2G
+      # 2554 objects do not fit in two gigabytes: the cache filled to 98% and
+      # evicted 655 of its own entries mid-build, costing a quarter of the hits.
+      CCACHE_MAXSIZE: 3G
       CCACHE_COMPILERCHECK: content
       CCACHE_SLOPPINESS: pch_defines,time_macros
     steps:
@@ -583,6 +589,24 @@ jobs:
             echo
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Drop superseded compiler caches
+        # Matches the save below, so a failed build still replaces its cache.
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          KEEP: |
+            ${{ steps.compiler-cache.outputs.cache-primary-key }}
+          PREFIXES: ccache-windows-x64-release-
+        run: |
+          # Deleted before the save rather than after it: the two would
+          # otherwise coexist and the repository would pass the ten
+          # gigabyte limit, evicting a dependency tree that costs hours.
+          # Safe only for a compiler cache, which one run rebuilds.
+          for prefix in $PREFIXES; do
+            gh cache list --repo "$GITHUB_REPOSITORY" --key "$prefix" --limit 100 --json key --jq '.[].key' |
+              grep -vxF "$KEEP" | while read -r key; do gh cache delete --repo "$GITHUB_REPOSITORY" "$key"; done || true
+          done
       - name: Save compiler cache
         # Saved even when the build failed: a retry then resumes from the
         # objects this run did produce instead of recompiling everything.
@@ -591,20 +615,6 @@ jobs:
         with:
           path: ${{ env.TBUILD }}\ccache
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
-      - name: Drop superseded compiler caches
-        continue-on-error: true
-        shell: bash
-        env:
-          KEEP: |
-            ${{ steps.compiler-cache.outputs.cache-primary-key }}
-          PREFIXES: ccache-windows-x64-release-
-        run: |
-          # Kept under ten gigabytes by deleting what each save superseded,
-          # right after that save rather than at the end of the job.
-          for prefix in $PREFIXES; do
-            gh cache list --repo "$GITHUB_REPOSITORY" --key "$prefix" --limit 100 --json key --jq '.[].key' |
-              grep -vxF "$KEEP" | while read -r key; do gh cache delete --repo "$GITHUB_REPOSITORY" "$key"; done || true
-          done
       - name: Verify and package Windows artifacts
         run: |
           $out = Join-Path $env:SRC 'out\Release'

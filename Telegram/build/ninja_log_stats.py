@@ -21,10 +21,13 @@ def parse_log(text):
 
 
 def target_of(output):
-    for part in output.split("/"):
+    # Windows logs mix separators, so a path can read
+    # `D:/a/out/CMakeFiles\\Telegram.dir\\main.cpp.obj`.
+    parts = output.replace("\\", "/").split("/")
+    for part in parts:
         if part.endswith(".dir"):
             return part[:-len(".dir")]
-    return output.split("/")[0]
+    return parts[-1] if len(parts) == 1 else parts[-2]
 
 
 def summarize(edges, top=25):

@@ -155,6 +155,10 @@ jobs:
           key: macos-universal-release-${{ steps.toolchain.outputs.id }}-${{ hashFiles('AyuGramDesktop/Telegram/build/prepare/**', 'AyuGramDesktop/Telegram/build/qt_version.py') }}
           restore-keys: macos-universal-release-${{ steps.toolchain.outputs.id }}-
       - name: Prepare libraries
+        env:
+          # The dependency tree is cached whole, so a compiler cache here only
+          # spends the compile cache budget on objects nothing reads again.
+          CCACHE_DISABLE: '1'
         run: |
           ./AyuGramDesktop/Telegram/build/prepare/mac.sh silent qt-release-only
           find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
@@ -402,7 +406,6 @@ jobs:
       TBUILD: ${{ github.workspace }}\TBuild
       SRC: ${{ github.workspace }}\TBuild\AyuGramDesktop
       CCACHE_DIR: ${{ github.workspace }}\TBuild\ccache
-      CCACHE_BASEDIR: ${{ github.workspace }}\TBuild
       CCACHE_DEPEND: 'true'
       CCACHE_MAXSIZE: 2G
       CCACHE_COMPILERCHECK: content
@@ -473,6 +476,11 @@ jobs:
           restore-keys: windows-x64-release-libraries-
       - name: Prepare libraries
         shell: cmd
+        env:
+          # meson picks ccache up from PATH and parses the `/showIncludes`
+          # output it wraps, so a compiler cache here breaks the setup of
+          # every meson library. The dependency tree is cached whole anyway.
+          CCACHE_DISABLE: '1'
         run: call %SRC%\Telegram\build\prepare\win.bat silent qt-release-only
       - name: Strip unused library files
         shell: bash

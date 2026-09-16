@@ -135,6 +135,13 @@ the compile; without it every miss adds a full MSVC preprocessing pass over
 the Qt headers, and a cold run, which is all misses, is exactly the one that
 has to fit inside the job limit.
 
+The dependency build runs with the compiler cache switched off. Its output is
+cached as a whole tree, so the objects would only crowd the application's out
+of the two gigabyte budget, and on Windows the cache is actively harmful:
+`meson` takes `ccache` from `PATH` as the compiler launcher and then parses the
+`/showIncludes` output it wraps, so a cache configured to rewrite paths makes
+`meson setup` fail outright on every library it builds.
+
 Both platforms prepare Qt with `qt-release-only`. The application is built
 Release-only, so the Debug half of a static Qt is work nobody consumes.
 

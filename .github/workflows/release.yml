@@ -22,6 +22,7 @@ jobs:
     outputs:
       sha: ${{ steps.head.outputs.sha }}
       version: ${{ steps.head.outputs.version }}
+      publish: ${{ steps.head.outputs.publish }}
     steps:
       - name: Require the default branch
         env:
@@ -54,10 +55,17 @@ jobs:
           test "$(awk '$1 == "AppVersionOriginal" { print $2 }' Telegram/build/version)" = "$version"
           test "$(awk '$1 == "BetaChannel" { print $2 }' Telegram/build/version)" = 0
           test "$(awk '$1 == "AlphaVersion" { print $2 }' Telegram/build/version)" = 0
-          test -z "$(git ls-remote --tags origin "refs/tags/v$version")"
           test ! -d Telegram/Resources/ayu/languages
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          # An already tagged version still builds, so the pipeline can be
+          # exercised and a failed release retried; only publishing is skipped.
+          if [ -z "$(git ls-remote --tags origin "refs/tags/v$version")" ]; then
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo "Tag \`v$version\` exists, so this run builds without publishing." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   source:
     name: Full source archive
@@ -651,6 +659,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [validate, source, macos, windows]
+    if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

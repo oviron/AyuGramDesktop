@@ -18,7 +18,9 @@ expensive jobs, then builds universal macOS and Windows x64 packages plus the
 full recursive source archive. Each macOS architecture builds in its own job
 because one cold build of both exceeds the six-hour job limit. The workflow
 creates the tag and public GitHub Release only after every build and package
-check succeeds.
+check succeeds. A version that is already tagged still builds; only the
+publishing step is skipped, so the pipeline can be exercised without
+republishing and a release that failed after tagging can be retried.
 
 Both platform jobs report into the log and the run summary: time per CMake
 target and the slowest translation units from `.ninja_log`, compiler cache

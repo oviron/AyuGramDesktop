@@ -2,12 +2,20 @@
 
 ## Unreleased
 
-- Warm the build caches from the default branch three times a week, so a
-  renamed release branch no longer starts from nothing.
-- Drive `Release` and `Cache warm` through one set of composite actions, and
-  cache the Windows compiler for the first time.
-- Report per-target build times and compiler cache statistics in the run
-  summary, and lint the composite actions in `Source checks`.
+- Build and publish a release from a single workflow, dispatched on the default
+  branch so it writes the caches every release branch can read. A version is
+  now compiled once instead of once to warm the caches and again to publish.
+- Key the Windows dependency caches by the build root. `prepare.py` embeds it
+  in every per-stage key, so a cache keyed without it hit while every stage
+  inside it missed, rebuilding Qt from source on each release.
+- Prepare Qt Release-only on both platforms; the application is built
+  Release-only and nothing consumed the Debug half.
+- Cache the Windows compiler for the first time, refresh every cache twice a
+  week against the seven-day eviction, and drop each superseded entry after a
+  successful save.
+- Report per-target build times, compiler cache statistics and the processor
+  count in the build log as well as the run summary, and attribute Windows
+  objects to their real targets instead of to the drive letter.
 
 ## 7.2.8 - 2026-09-15
 

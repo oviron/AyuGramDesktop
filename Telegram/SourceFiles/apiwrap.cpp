@@ -5545,6 +5545,7 @@ void ApiWrap::sendMultiPaidMedia(
 		}
 		if (done) done(true);
 	}, [=](const MTP::Error &error, const MTP::Response &response) {
+		_sendingAlbums.remove(groupId);
 		if (done) done(false);
 		sendMessageFail(error, peer, randomId, itemId);
 	});

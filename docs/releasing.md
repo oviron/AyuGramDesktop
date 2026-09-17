@@ -36,16 +36,28 @@ compilers do not fit in the runner's memory.
    `git switch -c codex/ayu-<version> origin/dev --no-track`. Resolve the
    conflicts in the AyuGram-patched sources. If upstream moved the `lib_ui` or
    `lib_tl` pins, merge and push those repositories first.
-2. Set the version in `Telegram/build/version`. It is the only place the
-   version is written; the workflow reads it and requires the branch to be
-   named `codex/ayu-<version>`.
-3. Push the branch and let `Source checks` go green before anything expensive
+2. Set the version in `Telegram/build/version`; the workflow reads it and
+   requires the branch to be named `codex/ayu-<version>`. Upstream bumps the
+   number in `Telegram/SourceFiles/core/version.h` and both files under
+   `Telegram/Resources/winrc/` as well, and those lines carry AyuGram's
+   product names, so all three conflict every time: keep the AyuGram side and
+   raise its number by hand.
+3. Check what upstream renamed underneath AyuGram's patches. A rename sweep
+   conflicts nowhere: git keeps the AyuGram line that used the old name and
+   the upstream lines that no longer define it, and the first sign is a
+   compiler error two hours into the build. Two greps over the merged tree
+   find it in seconds — every identifier the upstream range deleted that the
+   tree still uses, and every identifier an AyuGram line uses that no longer
+   appears on any upstream line of the same file. 7.2.9 hid two: `ppos`
+   became `innerPos` in the sticker box, and `floorclamp` and `ceilclamp`
+   left `lib_ui` for `Ui::RowsInRange`.
+4. Push the branch and let `Source checks` go green before anything expensive
    starts.
-4. Dispatch the release **from the default branch**, naming the branch to
+5. Dispatch the release **from the default branch**, naming the branch to
    build:
    `gh workflow run Release --ref dev -f ref=codex/ayu-<version>`.
 
-Step 4 is not a convenience. A run reaches only the caches of its own ref and
+Step 5 is not a convenience. A run reaches only the caches of its own ref and
 of the default branch, and the release branch is renamed every version, so a
 release dispatched on its own branch would write caches nothing else can ever
 read and start cold every time. The workflow refuses to run anywhere but the
@@ -63,8 +75,9 @@ that costs an hour or two per platform to build, and the last four touched
 exactly one source file, the one carrying the version number. 7.2.6 changed
 both files, because it replaced `rlottie` with `tlottie` and preparation
 started building a Rust library; the 7.2.5 to 7.2.7 range also rewrote 154 of
-the 2883 sources. Read those paths in the upstream diff before promising
-anyone a fast release.
+the 2883 sources. 7.2.9 changed `prepare.py` again and moved four submodule
+pins, so its first run paid for the dependencies a second time. Read those
+paths in the upstream diff before promising anyone a fast release.
 
 Merging is the slow half now, and none of this speeds it up: the conflicts in
 AyuGram-patched sources and the separate `lib_ui` and `lib_tl` merges are hand

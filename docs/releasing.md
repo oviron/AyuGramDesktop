@@ -42,22 +42,20 @@ compilers do not fit in the runner's memory.
    `Telegram/Resources/winrc/` as well, and those lines carry AyuGram's
    product names, so all three conflict every time: keep the AyuGram side and
    raise its number by hand.
-3. Check what upstream renamed underneath AyuGram's patches. A rename sweep
-   conflicts nowhere: git keeps the AyuGram line that used the old name and
-   the upstream lines that no longer define it, and the first sign is a
-   compiler error two hours into the build. Two greps over the merged tree
-   find it in seconds — every identifier the upstream range deleted that the
-   tree still uses, and every identifier an AyuGram line uses that no longer
-   appears on any upstream line of the same file. 7.2.9 hid two: `ppos`
-   became `innerPos` in the sticker box, and `floorclamp` and `ceilclamp`
-   left `lib_ui` for `Ui::RowsInRange`.
-4. Push the branch and let `Source checks` go green before anything expensive
+3. Push the branch and let `Source checks` go green before anything expensive
    starts.
-5. Dispatch the release **from the default branch**, naming the branch to
+4. Dispatch the release **from the default branch**, naming the branch to
    build:
    `gh workflow run Release --ref dev -f ref=codex/ayu-<version>`.
 
-Step 5 is not a convenience. A run reaches only the caches of its own ref and
+A rename sweep in an upstream release is worth a word of warning, because it
+conflicts nowhere: git keeps the AyuGram line that used the old name beside
+the upstream lines that no longer define it, and the build is the first thing
+that says so. 7.2.9 renamed `ppos` to `innerPos` in the sticker box and moved
+`floorclamp` and `ceilclamp` out of `lib_ui` into `Ui::RowsInRange`; both sites
+were AyuGram's own.
+
+Step 4 is not a convenience. A run reaches only the caches of its own ref and
 of the default branch, and the release branch is renamed every version, so a
 release dispatched on its own branch would write caches nothing else can ever
 read and start cold every time. The workflow refuses to run anywhere but the
@@ -224,7 +222,7 @@ not perform one.
 
 ## Contributing upstream
 
-The Telegram 7.2.8 update builds on
+The Telegram 7.2.9 update builds on
 [AyuGramDesktop #460](https://github.com/AyuGram/AyuGramDesktop/pull/460).
 Preserve its authorship and merge ancestry. The earlier macOS workflow proposal
 [#427](https://github.com/AyuGram/AyuGramDesktop/pull/427) is related work.

@@ -71,6 +71,7 @@ ComposeIcons {
 	menuSetShare: icon;
 	menuSetCopyLink: icon;
 	menuSetRemove: icon;
+	menuEmojiStatus: icon;
 	menuEmojiCopy: icon;
 	menuEmojiViewPack: icon;
 	menuEmojiRemoveRecent: icon;
@@ -82,6 +83,8 @@ ComposeIcons {
 	menuBelow: icon;
 	menuAbove: icon;
 	menuQualityHigh: icon;
+	menuCover: icon;
+	menuCoverRemove: icon;
 	menuPrice: icon;
 	menuEditStars: icon;
 
@@ -151,6 +154,7 @@ EmojiPan {
 	searchBackIconTop: pixels;
 	searchBackTextLeft: pixels;
 	searchBackTextTop: pixels;
+	photoButtonIcon: icon;
 	colorAll: IconButton;
 	colorAllLabel: FlatLabel;
 	removeSet: IconButton;
@@ -185,6 +189,8 @@ SendButton {
 	recordSize: size;
 	sendDisabledFg: color;
 	sendIconFg: color;
+	stopSize: size;
+	stopRadius: pixels;
 }
 
 RecordBarLock {
@@ -451,6 +457,30 @@ stickersScroll: ScrollArea(boxScroll) {
 	deltat: 19px;
 	deltab: 9px;
 }
+stickerSetBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+}
+stickerSetBoxRemoveButton: RoundButton(attentionBoxButton) {
+	height: 42px;
+	textTop: 12px;
+	style: semiboldTextStyle;
+}
+stickerSetBoxMenu: IconButton(boxTitleClose) {
+	width: 40px;
+
+	icon: icon {{ "title_menu_dots", boxTitleCloseFg }};
+	iconOver: icon {{ "title_menu_dots", boxTitleCloseFgOver }};
+
+	rippleAreaPosition: point(0px, 4px);
+}
+stickerSetBoxBadgeSkip: 6px;
 stickersRowDisabledOpacity: 0.4;
 stickersRowDuration: 200;
 
@@ -459,6 +489,7 @@ stickersAddCellPlusThickness: 2px;
 stickersAddCellBgRadius: 28px;
 emojiSetAddCellPlusSize: 13px;
 emojiSetAddCellBgRadius: 16px;
+stickersAddPanelSkip: 8px;
 
 stickersEmojiPickerSelectedBg: windowBgActive;
 
@@ -601,6 +632,12 @@ stickerIconMove: 400;
 stickerPreviewDuration: 150;
 stickerPreviewMin: 0.1;
 stickerPanFirstAfterShortcutsSkip: 4px;
+stickersPhotoRowPadding: margins(0px, 12px, 0px, 12px);
+stickersPhotoButtonHeight: 36px;
+stickersPhotoButtonRadius: 8px;
+stickersPhotoButtonPadding: margins(6px, 0px, 12px, 0px);
+stickersPhotoButtonIconSkip: 4px;
+stickersPhotoButtonFont: font(21px bold);
 mediaPreviewPhotoSkip: 48px;
 
 emojiPanColorAll: IconButton(stickerPanRemoveSet) {
@@ -703,6 +740,7 @@ defaultComposeIcons: ComposeIcons {
 	menuSetShare: menuIconShare;
 	menuSetCopyLink: menuIconLink;
 	menuSetRemove: menuIconDelete;
+	menuEmojiStatus: menuIconEmoji;
 	menuEmojiCopy: menuIconCopy;
 	menuEmojiViewPack: menuIconShowAll;
 	menuEmojiRemoveRecent: menuIconCancel;
@@ -714,6 +752,8 @@ defaultComposeIcons: ComposeIcons {
 	menuBelow: menuIconBelow;
 	menuAbove: menuIconAbove;
 	menuQualityHigh: menuIconQualityHigh;
+	menuCover: menuIconEdit;
+	menuCoverRemove: menuIconCancel;
 	menuPrice: menuIconEarn;
 
 	stripBubble: icon{
@@ -792,6 +832,7 @@ defaultEmojiPan: EmojiPan {
 	searchBackIconTop: 6px;
 	searchBackTextLeft: 40px;
 	searchBackTextTop: 10px;
+	photoButtonIcon: icon {{ "photo_editor/camera-24x24", windowFg }};
 	colorAll: emojiPanColorAll;
 	colorAllLabel: emojiPanColorAllLabel;
 	removeSet: stickerPanRemoveSet;
@@ -1060,6 +1101,7 @@ historyBusinessBotPhoto: UserpicButton(defaultUserpicButton) {
 }
 historyBusinessBotName: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
+	maxHeight: 20px;
 }
 historyBusinessBotStatus: FlatLabel(historyContactStatusLabel) {
 	textFg: windowSubTextFg;
@@ -1467,6 +1509,8 @@ historySend: SendButton {
 	recordSize: size(26px, 26px);
 	sendDisabledFg: historyComposeIconFg;
 	sendIconFg: historySendIconFg;
+	stopSize: size(14px, 14px);
+	stopRadius: 3px;
 }
 historyAiComposeButton: IconButton(historyAttach) {
 	width: 28px;

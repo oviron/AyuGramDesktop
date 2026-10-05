@@ -73,6 +73,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/emoji_interactions.h"
 #include "core/shortcuts.h"
 #include "core/application.h"
+#include "core/core_screenshot_protection.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
 #include "core/ui_integration.h"
@@ -144,6 +145,12 @@ base::options::toggle OptionExternalMediaViewer({
 	.name = "External media viewer",
 	.description = "Use system media viewer instead of the internal one.",
 });
+
+[[nodiscard]] bool HasSavingRestriction(HistoryItem *item) {
+	return item
+		&& (item->forbidsSaving()
+			|| !item->history()->peer->allowsForwarding());
+}
 
 class MainWindowShow final : public ChatHelpers::Show {
 public:
@@ -565,8 +572,10 @@ void SessionNavigation::resolveChannelById(
 		ChannelId channelId,
 		Fn<void(not_null<ChannelData*>)> done) {
 	if (const auto channel = _session->data().channelLoaded(channelId)) {
-		done(channel);
-		return;
+		if (!channel->isForbidden() || channel->isPublic()) {
+			done(channel);
+			return;
+		}
 	}
 	const auto fail = crl::guard(this, [=] {
 		uiShow()->showToast(tr::lng_error_post_link_invalid(tr::now));
@@ -580,7 +589,12 @@ void SessionNavigation::resolveChannelById(
 		result.match([&](const auto &data) {
 			const auto peer = _session->data().processChats(data.vchats());
 			if (peer && peer->id == peerFromChannel(channelId)) {
-				done(peer->asChannel());
+				const auto channel = peer->asChannel();
+				if (channel->isForbidden() && !channel->isPublic()) {
+					fail();
+				} else {
+					done(channel);
+				}
 			} else {
 				fail();
 			}
@@ -838,17 +852,16 @@ void SessionNavigation::showPeerByLinkResolved(
 				if (peer->isUser() && !draft.isEmpty()) {
 					Data::SetChatLinkDraft(peer, { draft });
 				}
-				if (historyInNewWindow) {
-					const auto window
-						= Core::App().ensureSeparateWindowFor(peer);
-					const auto controller = window
-						? window->sessionController()
-						: nullptr;
-					if (controller) {
-						controller->showPeerHistory(peer, params, msgId);
-					} else {
-						showPeerHistory(peer, params, msgId);
-					}
+				const auto id = SeparateId(peer);
+				const auto separate = (historyInNewWindow
+					&& CanShowSeparateWindow(id))
+					? Core::App().ensureSeparateWindowFor(id).get()
+					: nullptr;
+				if (separate) {
+					separate->sessionController()->showPeerHistory(
+						peer,
+						params,
+						msgId);
 				} else {
 					showPeerHistory(peer, params, msgId);
 				}
@@ -1287,7 +1300,7 @@ void SessionNavigation::showRepliesForMessage(
 			if (comments && !item) {
 				return;
 			}
-			auto &groups = _session->data().groups();
+			const auto &groups = _session->data().groups();
 			if (const auto group = item ? groups.find(item) : nullptr) {
 				item = group->items.front();
 			}
@@ -1912,6 +1925,18 @@ void SessionController::init() {
 		handleDrawToReplyRequest(std::move(request));
 	}, lifetime());
 	setupShortcuts();
+	setupScreenshotProtection();
+}
+
+void SessionController::setupScreenshotProtection() {
+	Core::App().screenshotProtection().addAmbientReason(activeChatValue(
+	) | rpl::map([](Dialogs::Key key) {
+		const auto peer = key.peer();
+		return peer
+			? (Data::AllowsForwardingValue(peer)
+				| rpl::map(!rpl::mappers::_1))
+			: (rpl::single(false) | rpl::type_erased);
+	}) | rpl::flatten_latest(), lifetime());
 }
 
 void SessionController::setupShortcuts() {
@@ -2660,7 +2685,7 @@ int SessionController::countDialogsWidthFromRatio(int bodyWidth) const {
 	const auto nochat = !mainSectionShown();
 	const auto width = bodyWidth
 		* Core::App().settings().dialogsWidthRatio(nochat);
-	auto result = qRound(width);
+	auto result = int(base::SafeRound(width));
 	accumulate_max(result, st::columnMinimalWidthLeft);
 //	accumulate_min(result, st::columnMaximalWidthLeft);
 	return result;
@@ -2798,13 +2823,6 @@ void SessionController::closeThirdSection() {
 	}
 }
 
-bool SessionController::canShowSeparateWindow(SeparateId id) const {
-	if (const auto thread = id.thread) {
-		return thread->peer()->computeUnavailableReason().isEmpty();
-	}
-	return true;
-}
-
 void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
 	if (const auto channel = peer->asChannel()) {
 		if (channel->isCommunity()) {
@@ -2817,7 +2835,8 @@ void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
 		const auto clickedChannel = peer->asChannel();
 		if (!clickedChannel->isPublic()
 			&& !clickedChannel->amIn()
-			&& (!currentPeer->isChannel()
+			&& (!currentPeer
+				|| !currentPeer->isChannel()
 				|| currentPeer->asChannel()->discussionLink()
 					!= clickedChannel)) {
 			MainWindowShow(this).showToast(peer->isMegagroup()
@@ -3085,7 +3104,7 @@ void SessionController::clearChooseReportMessages() const {
 void SessionController::showInNewWindow(
 		SeparateId id,
 		MsgId msgId) {
-	if (!canShowSeparateWindow(id)) {
+	if (!CanShowSeparateWindow(id)) {
 		Assert(id.thread != nullptr);
 		showThread(id.thread, msgId, SectionShow::Way::ClearStack);
 		return;
@@ -3177,7 +3196,7 @@ void SessionController::cancelUploadLayer(not_null<HistoryItem*> item) {
 		if (const auto item = data.message(itemId)) {
 			if (!item->isEditingMedia()) {
 				const auto history = item->history();
-				item->destroy();
+				data.destroyMessageWithCacheCleanup(item);
 				history->requestChatListMessage();
 			} else {
 				item->returnSavedMedia();
@@ -3362,8 +3381,10 @@ void SessionController::hideLayer(anim::type animated) {
 
 bool SessionController::openPhotoExternal(
 		not_null<PhotoData*> photo,
-		Data::FileOrigin origin) {
-	if (!OptionExternalMediaViewer.value()) {
+		Data::FileOrigin origin,
+		HistoryItem *item) {
+	if (!OptionExternalMediaViewer.value()
+		|| HasSavingRestriction(item)) {
 		return false;
 	}
 	const auto media = photo->createMediaView();
@@ -3402,7 +3423,7 @@ void SessionController::openPhoto(
 	const auto origin = item
 		? Data::FileOrigin(item->fullId())
 		: Data::FileOrigin();
-	if (openPhotoExternal(photo, origin)) {
+	if (openPhotoExternal(photo, origin, item)) {
 		return;
 	}
 	_window->openInMediaView(Media::View::OpenRequest(
@@ -3422,7 +3443,7 @@ void SessionController::openPhoto(
 			peerToUser(peer->id),
 			photo->id))
 		: Data::FileOrigin(Data::FileOriginPeerPhoto(peer->id));
-	if (openPhotoExternal(photo, origin)) {
+	if (openPhotoExternal(photo, origin, nullptr)) {
 		return;
 	}
 	_window->openInMediaView(Media::View::OpenRequest(this, photo, peer));
@@ -3438,7 +3459,9 @@ void SessionController::openDocument(
 	if (openSharedStory(item) || openFakeItemStory(message.id, stories)) {
 		return;
 	} else if (showInMediaView) {
-		if (OptionExternalMediaViewer.value() && !document->isTheme()) {
+		if (OptionExternalMediaViewer.value()
+			&& !document->isTheme()
+			&& !HasSavingRestriction(item)) {
 			const auto filepath = document->filepath();
 			if (filepath.isEmpty()) {
 				if (document->loadedInMediaCache()) {

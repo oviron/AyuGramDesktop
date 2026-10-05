@@ -17,10 +17,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/fields/input_field.h"
-#include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/kinetic_scroller.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/vertical_list.h"
@@ -58,7 +58,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_flexible_scroll.h"
 #include "chat_helpers/stickers_list_widget.h"
 #include "styles/style_chat_helpers.h"
-#include "styles/style_info.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -335,13 +334,13 @@ QString AddOption(
 	}
 
 	const auto searchable = name + ' ' + description;
+	const auto terms = SearchWords(searchable);
 	std::move(
 		query
 	) | rpl::on_next([=](const QString &text) {
-		const auto trimmed = text.trimmed();
-		const auto matches = trimmed.isEmpty()
-			|| searchable.contains(trimmed, Qt::CaseInsensitive);
-		wrap->toggle(matches, anim::type::instant);
+		wrap->toggle(
+			MatchesWords(terms, SearchWords(text)),
+			anim::type::instant);
 	}, wrap->lifetime());
 
 	return searchable;
@@ -390,13 +389,13 @@ QString AddFavoriteLinkButton(
 	SetupCopyDeepLink(window, button, option->id());
 
 	const auto searchable = name + ' ' + description;
+	const auto terms = SearchWords(searchable);
 	std::move(
 		query
 	) | rpl::on_next([=](const QString &text) {
-		const auto trimmed = text.trimmed();
-		const auto matches = trimmed.isEmpty()
-			|| searchable.contains(trimmed, Qt::CaseInsensitive);
-		wrap->toggle(matches, anim::type::instant);
+		wrap->toggle(
+			MatchesWords(terms, SearchWords(text)),
+			anim::type::instant);
 	}, wrap->lifetime());
 
 	return searchable;
@@ -463,6 +462,7 @@ void SetupExperimental(
 				Dialogs::kOptionForumHideChatsList,
 				Dialogs::kOptionDialogsUnreadOnTop,
 				Dialogs::Ui::kOptionDialogsMuteIcon,
+				kOptionUseNewChatView,
 				kOptionAutoScrollInactiveChat,
 				kModerateCommonGroups,
 				Info::kClassicProfileScroll,
@@ -520,7 +520,9 @@ void SetupExperimental(
 				Ui::GL::kOptionUseQtRhi,
 				Ui::GL::kOptionEnableVulkanRhi,
 				Core::kOptionFreeType,
-				Ui::kOptionQScroller,
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+				Ui::kOptionKineticScroller,
+#endif
 				Window::kOptionDisableTouchbar,
 				Window::kOptionNewWindowsSizeAsFirst,
 			}
@@ -567,13 +569,17 @@ void SetupExperimental(
 		Ui::AddSkip(inner);
 		Ui::AddDivider(inner);
 
+		auto terms = std::vector<QStringList>();
+		for (const auto &entry : searchable) {
+			terms.push_back(SearchWords(entry));
+		}
 		rpl::duplicate(
 			query
 		) | rpl::on_next([=](const QString &text) {
-			const auto trimmed = text.trimmed();
-			const auto matches = trimmed.isEmpty()
-				|| ranges::any_of(searchable, [&](const QString &entry) {
-					return entry.contains(trimmed, Qt::CaseInsensitive);
+			const auto words = SearchWords(text);
+			const auto matches = words.isEmpty()
+				|| ranges::any_of(terms, [&](const QStringList &entry) {
+					return MatchesWords(entry, words);
 				});
 			wrap->toggle(matches, anim::type::instant);
 		}, wrap->lifetime());
@@ -676,32 +682,17 @@ void Experimental::showFinished() {
 
 base::weak_qptr<Ui::RpWidget> Experimental::createPinnedToTop(
 		not_null<QWidget*> parent) {
-	_searchController = std::make_unique<Ui::SearchFieldController>(
-		_query.current());
-	auto rowView = _searchController->createRowView(
-		parent,
-		st::infoLayerMediaSearch);
-	_searchField = rowView.field;
-
-	const auto searchContainer = Ui::CreateChild<Ui::FixedHeightWidget>(
-		parent.get(),
-		st::infoLayerMediaSearch.height);
-	const auto wrap = rowView.wrap.release();
-	wrap->setParent(searchContainer);
-	wrap->show();
-
-	searchContainer->widthValue(
-	) | rpl::on_next([=](int width) {
-		wrap->resizeToWidth(width);
-		wrap->moveToLeft(0, 0);
-	}, searchContainer->lifetime());
+	auto search = CreateSectionSearchRow(parent, _query.current());
+	_searchController = std::move(search.controller);
+	const auto row = search.row;
+	_searchField = search.field;
 
 	_searchController->queryValue(
 	) | rpl::on_next([=](QString text) {
 		_query = std::move(text);
-	}, searchContainer->lifetime());
+	}, row->lifetime());
 
-	return base::make_weak(not_null<Ui::RpWidget*>{ searchContainer });
+	return base::make_weak(row);
 }
 
 void Experimental::setupContent() {

@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
+#include "data/components/welcome_messages.h"
 #include "settings/settings_faq_suggestions.h"
 #include "settings/settings_recent_searches.h"
 #include "data/data_session.h"
@@ -162,6 +163,7 @@ Session::Session(
 , _recentSharedGifts(std::make_unique<Data::RecentSharedMediaGifts>(this))
 , _giftAuctions(std::make_unique<Data::GiftAuctions>(this))
 , _scheduledMessages(std::make_unique<Data::ScheduledMessages>(this))
+, _welcomeMessages(std::make_unique<Data::WelcomeMessages>(this))
 , _ephemeralMessages(std::make_unique<Data::EphemeralMessages>(this))
 , _sponsoredMessages(std::make_unique<Data::SponsoredMessages>(this))
 , _topPeers(std::make_unique<Data::TopPeers>(this, Data::TopPeerType::Chat))
@@ -184,16 +186,22 @@ Session::Session(
 			// base::call_delayed(5000, [=] {
 				Core::App().lockBySetupEmail();
 			});
+			const auto weak = base::make_weak(this);
 			const auto unlockLifetime = std::make_shared<rpl::lifetime>();
 			_promoSuggestions->setupEmailStateValue(
 			) | rpl::filter([](Data::SetupEmailState s) {
 				return s == Data::SetupEmailState::None;
-			}) | rpl::take(1) | rpl::on_next(crl::guard(this, [=] {
+			}) | rpl::take(1) | rpl::on_next_done([=] {
+				unlockLifetime->destroy();
+				if (!weak) {
+					return;
+				}
 				Core::App().unlockSetupEmail();
 				_settings->setSetupEmailState(State::None);
 				saveSettingsDelayed(200);
+			}, [=] {
 				unlockLifetime->destroy();
-			}), *unlockLifetime);
+			}, *unlockLifetime);
 		} else {
 			_settings->setSetupEmailState(
 				_promoSuggestions->setupEmailState());

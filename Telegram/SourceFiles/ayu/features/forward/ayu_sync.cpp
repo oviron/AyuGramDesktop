@@ -851,47 +851,55 @@ bool sendRichMessageSync(not_null<Main::Session*> session,
 
 	crl::on_main([=]
 	{
-		const auto peer = action.history->peer;
+		auto sending = action;
+		sending.options.scheduled = 0;
+		sending.options.scheduleRepeatPeriod = 0;
+		sending.options.suggest = {};
+		sending.options.effectId = 0;
+		StripEphemeralReply(session, sending.replyTo);
+		applyGhostScheduling(session, sending.options);
+
+		const auto peer = sending.history->peer;
+		const auto starsPaid = std::min(
+			peer->starsPerMessageChecked(),
+			sending.options.starsApproved);
 
 		using Flag = MTPmessages_SendMessage::Flag;
 		auto sendFlags = MTPmessages_SendMessage::Flags(0)
 			| Flag::f_rich_message;
-		if (action.replyTo) {
+		if (sending.replyTo) {
 			sendFlags |= Flag::f_reply_to;
 		}
-		if (ShouldSendSilent(peer, action.options)) {
+		if (ShouldSendSilent(peer, sending.options)) {
 			sendFlags |= Flag::f_silent;
 		}
-		if (action.options.scheduled) {
+		if (sending.options.scheduled) {
 			sendFlags |= Flag::f_schedule_date;
-			if (action.options.scheduleRepeatPeriod) {
-				sendFlags |= Flag::f_schedule_repeat_period;
-			}
 		}
-		if (action.options.sendAs) {
+		if (sending.options.sendAs) {
 			sendFlags |= Flag::f_send_as;
 		}
-		if (action.options.effectId) {
-			sendFlags |= Flag::f_effect;
+		if (starsPaid) {
+			sendFlags |= Flag::f_allow_paid_stars;
 		}
 
 		session->api().request(MTPmessages_SendMessage(
 			MTP_flags(sendFlags),
 			peer->input(),
-			action.mtpReplyTo(),
+			sending.mtpReplyTo(),
 			MTP_string(QString()),
 			MTP_long(base::RandomValue<uint64>()),
 			MTPReplyMarkup(),
 			MTPVector<MTPMessageEntity>(),
-			MTP_int(action.options.scheduled),
-			MTP_int(action.options.scheduleRepeatPeriod),
-			(action.options.sendAs
-				? action.options.sendAs->input()
+			MTP_int(sending.options.scheduled),
+			MTP_int(0), // schedule_repeat_period
+			(sending.options.sendAs
+				? sending.options.sendAs->input()
 				: MTP_inputPeerEmpty()),
 			MTPInputQuickReplyShortcut(),
-			MTP_long(action.options.effectId),
-			MTP_long(0),
-			Api::SuggestToMTP(action.options.suggest),
+			MTP_long(0), // effect
+			MTP_long(starsPaid),
+			Api::SuggestToMTP(sending.options.suggest),
 			richMessage
 		)).done([=](const MTPUpdates &result)
 		{

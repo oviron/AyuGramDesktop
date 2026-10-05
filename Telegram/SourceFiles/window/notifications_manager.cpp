@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
 #include "history/view/history_view_chat_section.h"
 #include "lang/lang_keys.h"
 #include "data/notify/data_notify_settings.h"
@@ -912,7 +913,9 @@ void System::showNext() {
 					? nextNotify->item.get()
 					: nullptr;
 				if (nextItem
-					&& qAbs(int64(nextItem->date()) - int64(groupedItem->date())) < 2) {
+					&& std::abs(int64(nextItem->date())
+						- int64(groupedItem->date()))
+						< 2) {
 					if (isForwarded
 						&& groupedItem->author() == nextItem->author()) {
 						++forwardedCount;
@@ -1237,8 +1240,7 @@ TextWithEntities Manager::ComposePollVoteNotification(
 	if (hideContent) {
 		return tr::lng_poll_vote_notext(tr::now, tr::marked);
 	}
-	const auto media = item->media();
-	const auto poll = media ? media->poll() : nullptr;
+	const auto poll = LookupNotificationPoll(item);
 	if (!poll) {
 		return tr::lng_poll_vote_notext(tr::now, tr::marked);
 	}
@@ -1406,13 +1408,10 @@ Window::SessionController *Manager::openNotificationMessage(
 	}
 	const auto window = separate
 		? separate->sessionController()
-		: openSeparated
-		? [&] {
-			const auto window = Core::App().ensureSeparateWindowFor(
-				separateId,
-				itemId);
-			return window ? window->sessionController() : nullptr;
-		}()
+		: (openSeparated && CanShowSeparateWindow(separateId))
+		? Core::App().ensureSeparateWindowFor(
+			separateId,
+			itemId)->sessionController()
 		: history->session().tryResolveWindow();
 	if (window) {
 		window->widget()->showFromTray();
@@ -1700,11 +1699,15 @@ QRect NotificationDisplayRect(Window::Controller *controller) {
 		}
 	}
 
-	return screen
-		? screen->availableGeometry()
-		: controller
-		? controller->widget()->desktopRect()
-		: QGuiApplication::primaryScreen()->availableGeometry();
+	if (screen) {
+		return screen->availableGeometry();
+	} else if (controller) {
+		return controller->widget()->desktopRect();
+	}
+	// When the last monitor is removed QGuiApplication has no screens at
+	// all, so primaryScreen() is nullptr.
+	const auto primary = QGuiApplication::primaryScreen();
+	return primary ? primary->availableGeometry() : QRect();
 }
 
 } // namespace Notifications

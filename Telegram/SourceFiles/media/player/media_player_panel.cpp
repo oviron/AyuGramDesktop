@@ -97,7 +97,7 @@ bool Panel::preventAutoHide() const {
 void Panel::updateControlsGeometry() {
 	const auto scrollTop = contentTop();
 	const auto width = contentWidth();
-	const auto scrollHeight = qMax(
+	const auto scrollHeight = std::max(
 		height() - scrollTop - contentBottom() - scrollMarginBottom(),
 		0);
 	if (scrollHeight > 0) {
@@ -130,7 +130,10 @@ void Panel::updateSize() {
 		listHeight = widget->height();
 	}
 	auto scrollVisible = (listHeight > 0);
-	auto scrollHeight = scrollVisible ? (qMin(listHeight, st::mediaPlayerListHeightMax) + st::mediaPlayerListMarginBottom) : 0;
+	auto scrollHeight = scrollVisible
+		? (std::min(listHeight, st::mediaPlayerListHeightMax)
+			+ st::mediaPlayerListMarginBottom)
+		: 0;
 	height += scrollHeight + contentBottom();
 	resize(width, height);
 	_scroll->setVisible(scrollVisible);
@@ -251,9 +254,7 @@ void Panel::refreshList() {
 		const auto document = media ? media->document() : nullptr;
 		if (!document
 			|| !document->isSharedMediaMusic()
-			|| (!item->isRegular()
-				&& !item->isScheduled()
-				&& !item->isSavedMusicItem())) {
+			|| !IsRealPlaybackContext(item)) {
 			return nullptr;
 		}
 		savedMusicItem = item->isSavedMusicItem();

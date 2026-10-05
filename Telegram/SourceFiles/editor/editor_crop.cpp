@@ -384,7 +384,11 @@ void Crop::mouseReleaseEvent(QMouseEvent *e) {
 		setGridVisible(false, true);
 	}
 	clearDownState();
+	const auto was = saveCropRect();
 	convertCropPaintToOriginal();
+	if (saveCropRect() != was) {
+		_changes.fire({});
+	}
 }
 
 void Crop::computeDownState(const QPoint &p) {
@@ -585,6 +589,10 @@ void Crop::setCornersLevel(RoundedCornersLevel level) {
 	_painterPath.addRect(_innerRect);
 	_painterPath.addPath(cropPath());
 	update();
+}
+
+QRect Crop::paintRect() const {
+	return _cropPaint.toRect();
 }
 
 QRect Crop::saveCropRect() {

@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/stickers_box.h"
 #include "lang/lang_keys.h"
 #include "layout/layout_position.h"
+#include "menu/menu_emoji_status.h"
 #include "data/data_emoji_statuses.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
@@ -1868,7 +1869,7 @@ int EmojiListWidget::countDesiredHeight(int newWidth) {
 	const auto countResult = [this](int minimalLastHeight) {
 		const auto info = sectionInfo(sectionsCount() - 1);
 		return info.top
-			+ qMax(info.rowsBottom - info.top, minimalLastHeight);
+			+ std::max(info.rowsBottom - info.top, minimalLastHeight);
 	};
 	const auto minimalHeight = this->minimalHeight();
 	const auto minimalLastHeight = std::max(
@@ -1876,7 +1877,7 @@ int EmojiListWidget::countDesiredHeight(int newWidth) {
 		0);
 	const auto result = countResult(minimalLastHeight);
 	return result
-		? qMax(minimalHeight, result + padding.bottom())
+		? std::max(minimalHeight, result + padding.bottom())
 		: 0;
 }
 
@@ -2030,6 +2031,11 @@ void EmojiListWidget::fillRecentMenu(
 		const auto sticker = document->sticker();
 		const auto emoji = sticker->alt;
 		const auto setId = sticker->set.id;
+		EmojiStatusMenu::AddSetAsStatusAction(
+			addAction,
+			_show,
+			document,
+			&st().icons.menuEmojiStatus);
 		if (!emoji.isEmpty()) {
 			auto data = TextForMimeData{ emoji, { emoji } };
 			data.rich.entities.push_back({
@@ -2368,18 +2374,13 @@ void EmojiListWidget::paint(
 
 	_paintAsPremium = session().premium();
 
-	auto fromColumn = floorclamp(
+	auto [fromColumn, toColumn] = Ui::RowsInRange(
 		clip.x() - _rowsLeft,
-		_singleSize.width(),
-		0,
-		_columnCount);
-	auto toColumn = ceilclamp(
 		clip.x() + clip.width() - _rowsLeft,
 		_singleSize.width(),
-		0,
 		_columnCount);
 	if (rtl()) {
-		qSwap(fromColumn, toColumn);
+		std::swap(fromColumn, toColumn);
 		fromColumn = _columnCount - fromColumn;
 		toColumn = _columnCount - toColumn;
 	}
@@ -2499,15 +2500,10 @@ void EmojiListWidget::paint(
 		}
 		if (clip.top() + clip.height() > info.rowsTop) {
 			ensureLoaded(info.section);
-			auto fromRow = floorclamp(
+			const auto [fromRow, toRow] = Ui::RowsInRange(
 				clip.y() - info.rowsTop,
-				_singleSize.height(),
-				0,
-				info.rowsCount);
-			auto toRow = ceilclamp(
 				clip.y() + clip.height() - info.rowsTop,
 				_singleSize.height(),
-				0,
 				info.rowsCount);
 			for (auto i = fromRow; i < toRow; ++i) {
 				for (auto j = fromColumn; j < toColumn; ++j) {
@@ -2704,7 +2700,7 @@ void EmojiListWidget::drawCustom(
 		int index) {
 	auto &custom = _custom[set];
 	custom.painted = true;
-	auto &entry = custom.list[index];
+	const auto &entry = custom.list[index];
 	_emojiPaintContext->scale = context.progress;
 	_emojiPaintContext->position = position
 		+ _innerPosition
@@ -2720,7 +2716,7 @@ void EmojiListWidget::drawSearchSetCustom(
 		int index) {
 	auto &custom = searchSetBySection(section);
 	custom.painted = true;
-	auto &entry = custom.list[index];
+	const auto &entry = custom.list[index];
 	_emojiPaintContext->scale = context.progress;
 	_emojiPaintContext->position = position
 		+ _innerPosition
@@ -2760,7 +2756,7 @@ EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 	} else if (_searchMode && section > 0) {
 		const auto &set = searchSetBySection(section);
 		if (index < int(set.list.size())) {
-			auto &entry = set.list[index];
+			const auto &entry = set.list[index];
 			return { entry.document, entry.collectible };
 		}
 		return {};
@@ -2779,8 +2775,8 @@ EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 		}
 	} else if (section >= _staticCount
 		&& index < _custom[section - _staticCount].list.size()) {
-		auto &set = _custom[section - _staticCount];
-		auto &entry = set.list[index];
+		const auto &set = _custom[section - _staticCount];
+		const auto &entry = set.list[index];
 		return { entry.document, entry.collectible };
 	}
 	return {};
@@ -3099,7 +3095,7 @@ void EmojiListWidget::showPicker() {
 		}
 		auto xmax = width() - _picker->width();
 		if (rtl()) xCoef = 1. - xCoef;
-		_picker->move(qRound(xmax * xCoef), y);
+		_picker->move(int(base::SafeRound(xmax * xCoef)), y);
 
 		disableScroll(true);
 	};
@@ -4022,7 +4018,11 @@ void EmojiListWidget::updateSelected() {
 	} else if (p.y() >= info.rowsTop && p.y() < info.rowsBottom) {
 		auto sx = (rtl() ? width() - p.x() : p.x()) - _rowsLeft;
 		if (sx >= 0 && sx < _columnCount * _singleSize.width()) {
-			const auto index = qFloor((p.y() - info.rowsTop) / _singleSize.height()) * _columnCount + qFloor(sx / _singleSize.width());
+			const auto rowIndex = int(std::floor(
+				(p.y() - info.rowsTop) / _singleSize.height()));
+			const auto columnIndex
+				= int(std::floor(sx / _singleSize.width()));
+			const auto index = rowIndex * _columnCount + columnIndex;
 			if (index < info.count) {
 				newSelected = OverEmoji{ .section = section, .index = index };
 			}
@@ -4087,7 +4087,7 @@ void EmojiListWidget::setPressed(OverState newPressed) {
 				&& button->section <= int(_searchSets.size()))
 			|| (button->section >= _staticCount
 				&& button->section < _staticCount + _custom.size()));
-		auto &ripple = (_searchMode && button->section > 0)
+		const auto &ripple = (_searchMode && button->section > 0)
 			? searchSetBySection(button->section).ripple
 			: (button->section >= _staticCount)
 			? _custom[button->section - _staticCount].ripple
@@ -4098,7 +4098,7 @@ void EmojiListWidget::setPressed(OverState newPressed) {
 	} else if (auto shortcut = std::get_if<OverSearchShortcut>(&_pressed)) {
 		if (shortcut->index >= 0
 			&& shortcut->index < _searchShortcutSets.size()) {
-			auto &ripple = _searchShortcutSets[shortcut->index].ripple;
+			const auto &ripple = _searchShortcutSets[shortcut->index].ripple;
 			if (ripple) {
 				ripple->lastStop();
 			}

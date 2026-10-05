@@ -90,7 +90,7 @@ constexpr auto kLogEntryPreviewLines = 2;
 			result.push_back(std::make_unique<Data::MediaPhoto>(
 				parent,
 				*photo,
-				spoiler));
+				Data::MediaPhoto::Args{ .spoiler = spoiler }));
 		} else {
 			return {};
 		}
@@ -1104,7 +1104,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 		ensurePhotoMediaCreated();
 
 		auto pix = QPixmap();
-		const auto pw = qMax(_pixw, lineHeight);
+		const auto pw = std::max(_pixw, lineHeight);
 		const auto ph = _pixh;
 		auto pixw = _pixw;
 		auto pixh = ArticleThumbHeight(_photoMedia.get(), _pixw);

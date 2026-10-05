@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 #include <QtCore/QUrl>
+#include <QtCore/QtMath>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 #include <QtGui/QWindow>
@@ -290,6 +291,9 @@ void LogNativeMessageRejected(
 			LogNativeMessageRejected(reason, byteCount, command);
 			return std::optional<NativeMessage>();
 		};
+		if (!IsExternalShellOrigin(OriginFromUrl(sourceUrl))) {
+			return reject(u"bad external sender"_q);
+		}
 		if (object.value(u"type"_q).toString()
 			!= QString::fromLatin1(kExternalMessageType)) {
 			return reject(u"bad external type"_q);
@@ -315,6 +319,9 @@ void LogNativeMessageRejected(
 				|| !IsExternalShellOrigin(origin.toString())) {
 				return reject(u"bad shell origin"_q);
 			}
+		} else if (!origin.isString()
+			|| OriginFromUrl(origin.toString()).isEmpty()) {
+			return reject(u"bad webapp origin"_q);
 		}
 		if (!object.value(u"eventType"_q).isString() || command.isEmpty()) {
 			return reject(u"bad command"_q);
@@ -335,7 +342,7 @@ void LogNativeMessageRejected(
 		return NativeMessage{
 			.source = source,
 			.origin = (source == NativeMessageSource::ExternalWebApp)
-				? origin.toString()
+				? OriginFromUrl(origin.toString())
 				: QString(),
 			.command = command,
 			.arguments = arguments,
@@ -380,6 +387,18 @@ void LogNativeMessageRejected(
 	return ::Platform::IsLinux();
 }
 
+[[nodiscard]] QSize PanelInnerSize() {
+	const auto &settings = AyuSettings::getInstance();
+	auto size = QSize(st::botWebViewPanelSize);
+	if (settings.increaseWebviewHeight()) {
+		size.setHeight(st::botWebViewPanelHeightIncreased);
+	}
+	if (settings.increaseWebviewWidth()) {
+		size.setWidth(st::botWebViewPanelWidthIncreased);
+	}
+	return size;
+}
+
 [[nodiscard]] QColor ResolveExternalShellThemeColor(QColor color) {
 	return (color.alpha() == 255) ? color : st::windowBg->c;
 }
@@ -411,6 +430,7 @@ enum class SharedPanelMenuAction {
 	ShareGame,
 	Terms,
 	Privacy,
+	Report,
 	RemoveFromMenu,
 	RemoveFromMainMenu,
 	DownloadOpen,
@@ -460,6 +480,8 @@ struct SharedPanelMenuDispatchArgs {
 		return u"terms"_q;
 	case SharedPanelMenuAction::Privacy:
 		return u"privacy"_q;
+	case SharedPanelMenuAction::Report:
+		return u"report"_q;
 	case SharedPanelMenuAction::RemoveFromMenu:
 		return u"remove_from_menu"_q;
 	case SharedPanelMenuAction::RemoveFromMainMenu:
@@ -522,6 +544,8 @@ struct ParsedSharedPanelMenuAction {
 		return { SharedPanelMenuAction::Terms };
 	} else if (id == u"privacy"_q) {
 		return { SharedPanelMenuAction::Privacy };
+	} else if (id == u"report"_q) {
+		return { SharedPanelMenuAction::Report };
 	} else if (id == u"remove_from_menu"_q) {
 		return { SharedPanelMenuAction::RemoveFromMenu };
 	} else if (id == u"remove_from_main_menu"_q) {
@@ -574,6 +598,11 @@ void DispatchSharedPanelMenuAction(
 	case SharedPanelMenuAction::Privacy:
 		if (dispatch.privacy) {
 			dispatch.privacy();
+		}
+		break;
+	case SharedPanelMenuAction::Report:
+		if (dispatch.menuButton) {
+			dispatch.menuButton(MenuButton::Report);
 		}
 		break;
 	case SharedPanelMenuAction::RemoveFromMenu:
@@ -699,6 +728,14 @@ void DispatchSharedPanelMenuAction(
 			.iconKey = u"privacy"_q,
 			.icon = &st::menuIconAntispam,
 		});
+		if (args.buttons & MenuButton::Report) {
+			result.push_back({
+				.id = SharedPanelMenuActionId(SharedPanelMenuAction::Report),
+				.text = tr::lng_profile_report(tr::now),
+				.iconKey = u"report"_q,
+				.icon = &st::menuIconReport,
+			});
+		}
 	}
 	if (args.buttons & MenuButton::RemoveFromMainMenu) {
 		result.push_back({
@@ -760,28 +797,12 @@ void FillNativeSharedPanelMenu(
 	}
 }
 
-[[nodiscard]] QImage RasterizeStyleIcon(const style::icon &icon) {
-	const auto size = icon.size();
-	const auto ratio = style::DevicePixelRatio();
-	auto image = QImage(size * ratio, QImage::Format_ARGB32_Premultiplied);
-	image.setDevicePixelRatio(ratio);
-	image.fill(Qt::transparent);
-	auto painter = Painter(&image);
-	icon.paintInCenter(painter, QRect(QPoint(), size));
-	return image;
-}
-
-[[nodiscard]] QImage RasterizeVerifiedBadge() {
-	const auto size = st::infoVerifiedStar.size() + QSize(0, st::lineWidth);
-	const auto ratio = style::DevicePixelRatio();
-	auto image = QImage(size * ratio, QImage::Format_ARGB32_Premultiplied);
-	image.setDevicePixelRatio(ratio);
-	image.fill(Qt::transparent);
-	auto painter = Painter(&image);
-	const auto width = size.width();
-	st::infoVerifiedStar.paint(painter, st::lineWidth, 0, width);
-	st::infoPeerBadge.verifiedCheck.paint(painter, st::lineWidth, 0, width);
-	return image;
+// WebKit maps CSS pixels to the screen by itself, so rasterize above any
+// screen density (Qt floors it on X11) and let it downscale.
+[[nodiscard]] int ExternalShellAssetRatio() {
+	return std::min(
+		style::DevicePixelRatio() + 1,
+		style::kScaleMax / 100);
 }
 
 [[nodiscard]] QString PngDataUrl(const QImage &image) {
@@ -807,15 +828,41 @@ void FillNativeSharedPanelMenu(
 	return result;
 }
 
-[[nodiscard]] QJsonObject SerializeStyleIconAsset(const style::icon &icon) {
-	return SerializeRasterAsset(RasterizeStyleIcon(icon), icon.size());
+[[nodiscard]] QJsonObject SerializeStyleIconAsset(
+		const style::icon &icon,
+		const style::color &color) {
+	const auto ratio = ExternalShellAssetRatio();
+	const auto image = icon.instance(
+		color->c,
+		ratio * 100,
+		true);
+	return SerializeRasterAsset(image, image.size() / ratio);
 }
 
 [[nodiscard]] QJsonObject SerializeVerifiedBadgeAsset() {
-	const auto size = st::infoVerifiedStar.size() + QSize(0, st::lineWidth);
+	const auto ratio = ExternalShellAssetRatio();
+	const auto scale = ratio * 100;
+	const auto star = st::infoVerifiedStar.instance(
+		st::profileVerifiedCheckBg->c,
+		scale,
+		true);
+	const auto check = st::infoPeerBadge.verifiedCheck.instance(
+		st::profileVerifiedCheckFg->c,
+		scale,
+		true);
+	const auto line = LinuxShell::Unscaled(st::lineWidth) * ratio;
+	auto image = QImage(
+		star.size() + QSize(0, line),
+		QImage::Format_ARGB32_Premultiplied);
+	image.fill(Qt::transparent);
+	{
+		auto p = QPainter(&image);
+		p.drawImage(line, 0, star);
+		p.drawImage(line, 0, check);
+	}
 	return SerializeRasterAsset(
-		RasterizeVerifiedBadge(),
-		size,
+		image,
+		image.size() / ratio,
 		tr::lng_sr_verified_badge(tr::now));
 }
 
@@ -826,7 +873,9 @@ void CollectSharedPanelMenuIcons(
 		if (!item.iconKey.isEmpty()
 			&& item.icon
 			&& !result.contains(item.iconKey)) {
-			result.insert(item.iconKey, SerializeStyleIconAsset(*item.icon));
+			result.insert(
+				item.iconKey,
+				SerializeStyleIconAsset(*item.icon, st::menuIconColor));
 		}
 		if (!item.children.empty()) {
 			CollectSharedPanelMenuIcons(item.children, result);
@@ -1213,16 +1262,7 @@ Panel::Panel(Args &&args)
 	}
 	_widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
 
-	const auto &settings = AyuSettings::getInstance();
-	auto size = QSize(st::botWebViewPanelSize);
-	if (settings.increaseWebviewHeight()) {
-		size.setHeight(st::botWebViewPanelHeightIncreased);
-	}
-	if (settings.increaseWebviewWidth()) {
-		size.setWidth(st::botWebViewPanelWidthIncreased);
-	}
-
-	_widget->setInnerSize(size, true);
+	_widget->setInnerSize(PanelInnerSize(), true);
 
 	const auto panel = _widget.get();
 	rpl::duplicate(
@@ -1880,7 +1920,10 @@ void Panel::requestExternalShellButtonEmoji(const QString &name) {
 	_delegate->botResolveButtonEmoji({
 		.customEmojiId = state->args.iconCustomEmojiId,
 		.textColor = state->textColor,
-		.size = kExternalShellButtonIconSize,
+		// Custom emoji take a logical size, rasterize them as other assets.
+		.size = qCeil(kExternalShellButtonIconSize
+			* ExternalShellAssetRatio()
+			/ double(style::DevicePixelRatio())),
 		.callback = std::move(send),
 	});
 }
@@ -1909,7 +1952,9 @@ void Panel::sendExternalShellAssets() {
 	sendExternalShellMethod("setAssets", {
 		{ u"icons"_q, icons },
 		{ u"titleMenuIcon"_q,
-			SerializeStyleIconAsset(st::separatePanelMenu.icon) },
+			SerializeStyleIconAsset(
+				st::separatePanelMenu.icon,
+				st::boxTitleCloseFg) },
 		{ u"verifiedBadge"_q, SerializeVerifiedBadgeAsset() },
 		{ u"menuPalette"_q, LinuxShell::MenuPalette() },
 	});
@@ -2153,10 +2198,10 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 				? Webview::WindowStyle::Frameless
 				: Webview::WindowStyle::Default,
 			.windowMargins = _externalShell
-				? st::botWebViewShellShadowPadding
+				? LinuxShell::Unscaled(st::botWebViewShellShadowPadding)
 				: QMargins(),
 			.initialSize = _externalShell
-				? LinuxShell::WindowSize(st::botWebViewPanelSize)
+				? LinuxShell::WindowSize(PanelInnerSize())
 				: QSize(),
 			.shellMessageToken = _externalShell
 				? _externalShellToken
@@ -2587,7 +2632,9 @@ void Panel::sendContentSafeArea() {
 		: 0;
 	const auto scaled = top * style::DevicePixelRatio();
 	auto report = 0;
-	if (const auto screen = QGuiApplication::primaryScreen()) {
+	if (_externalShell) {
+		report = LinuxShell::Unscaled(top);
+	} else if (const auto screen = QGuiApplication::primaryScreen()) {
 		const auto dpi = screen->logicalDotsPerInch();
 		const auto ratio = screen->devicePixelRatio();
 		const auto basePair = screen->handle()->logicalBaseDpi();
@@ -2832,7 +2879,7 @@ void Panel::openExternalLink(const QJsonObject &args) {
 	const auto iv = args["try_instant_view"].toBool();
 	const auto url = args["url"].toString();
 	if (!_delegate->botValidateExternalLink(url)) {
-		LOG(("BotWebView Error: Bad url in openExternalLink: %1").arg(url));
+		LOG(("BotWebView Error: Bad url in openExternalLink."));
 		requestClose();
 		return;
 	} else if (!allowOpenLink()) {

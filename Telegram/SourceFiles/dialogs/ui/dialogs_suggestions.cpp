@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_chat_participants.h"
 #include "apiwrap.h"
+#include "base/event_filter.h"
 #include "base/unixtime.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "boxes/choose_filter_box.h"
@@ -66,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/search_field_controller.h"
 #include "ui/unread_badge_paint.h"
+#include "ui/unread_counter_format.h"
 #include "ui/ui_utility.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
@@ -76,6 +78,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_window.h"
+
+#include <QtWidgets/QApplication>
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
 
 namespace Dialogs {
 namespace {
@@ -298,9 +306,7 @@ bool RecentRow::refreshBadge() {
 
 		_badgeString = !_counter
 			? (_unread ? u" "_q : QString())
-			: (_counter < 1000)
-			? QString::number(_counter)
-			: (QString::number(_counter / 1000) + 'K');
+			: FormatUnreadCounterShort(_counter);
 		if (_badgeString.isEmpty()) {
 			_badgeSize = QSize();
 		} else {
@@ -376,9 +382,7 @@ void RecentRow::rightActionPaint(
 	} else if (_badgeString.isEmpty()) {
 		_badgeString = !_counter
 			? u" "_q
-			: (_counter < 1000)
-			? QString::number(_counter)
-			: (QString::number(_counter / 1000) + 'K');
+			: FormatUnreadCounterShort(_counter);
 	}
 	auto st = Ui::UnreadBadgeStyle();
 	st.selected = selected;
@@ -1123,7 +1127,9 @@ void RecommendationsController::prepare() {
 }
 
 void RecommendationsController::load() {
-	if (_requested || countCurrent()) {
+	if (_requested
+		|| countCurrent()
+		|| AyuSettings::getInstance().hideSimilarChannels()) {
 		return;
 	}
 	_requested = true;
@@ -1138,7 +1144,7 @@ void RecommendationsController::load() {
 void RecommendationsController::fill() {
 	const auto participants = &session().api().chatParticipants();
 	const auto &list = participants->recommendations().list;
-	if (list.empty()) {
+	if (list.empty() || AyuSettings::getInstance().hideSimilarChannels()) {
 		return;
 	}
 	for (const auto &peer : list) {
@@ -1881,6 +1887,7 @@ void Suggestions::chooseRow() {
 
 bool Suggestions::consumeSearchQuery(const QString &query) {
 	using Type = MediaType;
+	_persistLifetime.destroy();
 	const auto key = _key.current();
 	const auto tab = key.tab;
 	const auto type = (key.tab == Tab::Media) ? key.mediaType : Type::kCount;
@@ -2114,13 +2121,6 @@ Data::Thread *Suggestions::updateFromChannelsDrag(QPoint globalPosition) {
 	return fromListId(_recommendations->updateFromParentDrag(globalPosition));
 }
 
-Data::Thread *Suggestions::updateFromAppsDrag(QPoint globalPosition) {
-	if (const auto id = _recentApps->updateFromParentDrag(globalPosition)) {
-		return fromListId(id);
-	}
-	return fromListId(_popularApps->updateFromParentDrag(globalPosition));
-}
-
 Data::Thread *Suggestions::fromListId(uint64 peerListRowId) {
 	return peerListRowId
 		? _controller->session().data().history(PeerId(peerListRowId)).get()
@@ -2195,6 +2195,9 @@ void Suggestions::ensureContent(Key key) {
 		_controller,
 		Info::Wrap::Search,
 		memento.get());
+	list.wrap->controller()->setJumpToMessageCallback(crl::guard(this, [=] {
+		persistUntilClickOutside();
+	}));
 	list.wrap->show();
 	updateControlsGeometry();
 }
@@ -2776,7 +2779,28 @@ bool Suggestions::persist() const {
 	return _persist;
 }
 
+void Suggestions::persistUntilClickOutside() {
+	if (_persist) {
+		return;
+	}
+	_persist = true;
+	base::install_event_filter(QCoreApplication::instance(), [=](
+			not_null<QEvent*> e) {
+		if (e->type() == QEvent::MouseButtonPress
+			&& !QApplication::activePopupWidget()
+			&& !rect().contains(mapFromGlobal(QCursor::pos()))) {
+			_persist = false;
+			crl::on_main(this, [=] {
+				_persistLifetime.destroy();
+				_persistReleased.fire({});
+			});
+		}
+		return base::EventFilterResult::Continue;
+	}, _persistLifetime);
+}
+
 void Suggestions::clearPersistance() {
+	_persistLifetime.destroy();
 	_persist = false;
 }
 

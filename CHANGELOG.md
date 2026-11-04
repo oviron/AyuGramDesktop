@@ -1,5 +1,20 @@
 # Changelog
 
+## 7.3.5 - 2026-11-04
+
+- Updated the application base to Telegram Desktop 7.3.5 ahead of an AyuGram
+  release of it, with the changes of the 7.3.4 beta: the new chat view for
+  everyone, search tabs for apps, channels and media, and a large set of
+  security and crash fixes.
+- Kept AyuGram's music row with the cover in profiles. Telegram Desktop 7.3.5
+  moved profile music into a pill under the action buttons; that pill stays
+  hidden so the track is not shown twice, while the balance pill works as in
+  Telegram Desktop.
+- Clear the ID search selection together with the other search rows, which
+  the new deselect-on-top step of the chat search can now reach.
+- `lib_ui` comes from this fork's copy of AyuGram's branch with Telegram
+  Desktop 7.3.5 merged in; `codegen` and `lib_tl` did not move.
+
 ## 7.3.3 - 2026-10-22
 
 - Updated the application base to Telegram Desktop 7.3.3 ahead of an AyuGram

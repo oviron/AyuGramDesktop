@@ -1,5 +1,20 @@
 # Changelog
 
+## 7.4.1 - 2026-11-09
+
+- Updated the application base to Telegram Desktop 7.4.1 ahead of an AyuGram
+  release of it, with 7.4.0: interactive widgets in bot messages, payments
+  and data signing for them through Gram Wallet's TON Connect window, a fix
+  for a crash at launch and several other crash fixes.
+- An incoming message is now counted as unread before the new chat view can
+  see it. Since 7.3.3 the count was raised before the chat was notified of the
+  message, but the new chat view, the default since 7.3.5, can read it
+  earlier still, while the message is being indexed. In a chat with no
+  messages shown, that read never reached the server and other devices kept
+  the message unread.
+- `lib_ui` comes from this fork's copy of AyuGram's branch with Telegram
+  Desktop 7.4.1 merged in; `codegen` and `lib_tl` did not move.
+
 ## 7.3.5 - 2026-11-04
 
 - Updated the application base to Telegram Desktop 7.3.5 ahead of an AyuGram

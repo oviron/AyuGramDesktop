@@ -1685,18 +1685,9 @@ void History::newItemAdded(not_null<HistoryItem*> item, NewAddType type) {
 	if (type == NewAddType::StreamedDraftFinish) {
 		applyStreamedDraftFinish(item);
 	}
-	item->indexAsNewItem();
-	item->addToMessagesIndex();
-	if (const auto from = item->from() ? item->from()->asUser() : nullptr) {
-		if (from == item->author()) {
-			_sendActionPainter.clear(from);
-			owner().sendActionManager().repliesPaintersClear(this, from);
-		}
-		from->madeAction(item->date());
-	}
-	item->contributeToSlowmode();
-	// WHY: count it before notifyNewItemAdded: a shown chat may read it
-	// synchronously, and readInboxTill trusts the unread count.
+	// WHY: count it before addToMessagesIndex and notifyNewItemAdded: both
+	// let a shown chat read it synchronously, and readInboxTill trusts the
+	// unread count.
 	if (!item->out()) {
 		if (item->unread(this)) {
 			if (unreadCountKnown()) {
@@ -1708,6 +1699,16 @@ void History::newItemAdded(not_null<HistoryItem*> item, NewAddType type) {
 			inboxRead(item);
 		}
 	}
+	item->indexAsNewItem();
+	item->addToMessagesIndex();
+	if (const auto from = item->from() ? item->from()->asUser() : nullptr) {
+		if (from == item->author()) {
+			_sendActionPainter.clear(from);
+			owner().sendActionManager().repliesPaintersClear(this, from);
+		}
+		from->madeAction(item->date());
+	}
+	item->contributeToSlowmode();
 	auto notification = Data::ItemNotification{
 		.item = item,
 		.type = Data::ItemNotificationType::Message,

@@ -102,7 +102,10 @@ jobs:
           archive="$RUNNER_TEMP/$root-full.tar"
           git archive --format=tar --prefix="$root/" HEAD -o "$archive"
           while read -r revision path rest; do
-            revision="${revision#[-+U]}"
+            # A submodule the checkout skips, like widget-sandbox's
+            # test262 with update = none, has no tree to archive.
+            case "$revision" in -*) continue ;; esac
+            revision="${revision#[+U]}"
             test "$(git -C "$path" rev-parse HEAD)" = "$revision"
             part="$RUNNER_TEMP/submodule-$(printf '%s' "$path" | sha256sum | cut -c1-16).tar"
             git -C "$path" archive --format=tar --prefix="$root/$path/" "$revision" -o "$part"

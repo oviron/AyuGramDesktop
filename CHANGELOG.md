@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.4.2 - 2026-11-11
+
+- Updated the application base to Telegram Desktop 7.4.2 ahead of an AyuGram
+  release of it: Qt's HTTP response limits for CVE-2026-116337, a chats column
+  and a third column of its own for each window, restored on relaunch, inline
+  video playback up to 1920x1920, and fixes for the first message missing
+  from a just-created topic, two chat lists shown at once when switching
+  filters and a crash on quit with the story views menu open.
+- The userpic in the notification preview keeps AyuGram's corner radius and
+  takes Telegram Desktop's smoothing, which fixes its blurry edge.
+- `lib_ui`, `codegen` and `lib_tl` did not move.
+
 ## 7.4.1 - 2026-11-09
 
 - Updated the application base to Telegram Desktop 7.4.1 ahead of an AyuGram

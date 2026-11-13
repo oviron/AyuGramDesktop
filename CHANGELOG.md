@@ -1,5 +1,20 @@
 # Changelog
 
+## 7.4.3 - 2026-11-13
+
+- Updated the application base to Telegram Desktop 7.4.3 ahead of an AyuGram
+  release of it: replies to forwarded messages with an instant local bubble,
+  a voice and round messages filter in shared media, multiple selection in
+  the contacts and proxy lists, Ctrl+O to replace media while editing a
+  caption, and fixes for a freeze when a screen reader reads a long history,
+  a crash opening media of unsent scheduled messages, file selection in mini
+  apps and a squeezed maximized window on Windows.
+- The contacts list keeps AyuGram's mutual contact mark and its hint on
+  click: Telegram Desktop 7.4.3 moved the list into its own box with
+  selectable rows, and the mark moved with it.
+- `lib_ui` comes from this fork's copy of AyuGram's branch with Telegram
+  Desktop 7.4.3 merged in; `codegen` and `lib_tl` did not move.
+
 ## 7.4.2 - 2026-11-11
 
 - Updated the application base to Telegram Desktop 7.4.2 ahead of an AyuGram

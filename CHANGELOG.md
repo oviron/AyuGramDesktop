@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.4.4 - 2026-11-14
+
+- Updated the application base to Telegram Desktop 7.4.4 ahead of an AyuGram
+  release of it: hardening of interactive widgets in bot messages (a storage
+  quota, limits on stretched groups and on colour glyphs drawn in a frame, a
+  damaged PNG with an impossible bit depth is refused, checked CSS keywords)
+  and bounded dictionary parsing in the wallet engine.
+- `lib_ui`, `codegen` and `lib_tl` did not move.
+
 ## 7.4.3 - 2026-11-13
 
 - Updated the application base to Telegram Desktop 7.4.3 ahead of an AyuGram

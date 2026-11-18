@@ -1,5 +1,12 @@
 # Changelog
 
+## 7.4.4-2 - 2026-11-18
+
+- AI summaries of messages now always ask the server for the reader's
+  language: the chat translation language when translation is on, otherwise
+  the "Translate to" language from settings. Without it the server sometimes
+  summarized Russian posts in English.
+
 ## 7.4.4 - 2026-11-14
 
 - Updated the application base to Telegram Desktop 7.4.4 ahead of an AyuGram

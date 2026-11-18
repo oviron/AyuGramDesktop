@@ -128,7 +128,7 @@ jobs:
   macos-build:
     name: macOS ${{ matrix.architecture }} Release
     needs: validate
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
     timeout-minutes: 350
     permissions:
       contents: read
@@ -138,11 +138,8 @@ jobs:
       matrix:
         include:
           - architecture: arm64
-            runner: macos-15
             swift_target: arm64-apple-macos11.0
-          # Native Intel runners keep x86_64 off the scarce arm64 pool.
           - architecture: x86_64
-            runner: macos-15-intel
             swift_target: x86_64-apple-macos10.13
     env:
       GH_TOKEN: ${{ github.token }}
@@ -322,7 +319,7 @@ jobs:
   macos:
     name: macOS universal Release
     needs: [validate, macos-build]
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 30
     env:
       VERSION: ${{ needs.validate.outputs.version }}

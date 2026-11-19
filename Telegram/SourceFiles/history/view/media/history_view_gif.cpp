@@ -171,6 +171,7 @@ struct Gif::Streamed {
 	QImage frozenFrame;
 	QString frozenStatusText;
 	std::optional<crl::time> startPosition;
+	bool resuming = false;
 };
 
 Gif::Streamed::Streamed(
@@ -2605,6 +2606,7 @@ void Gif::startStreamedPlayer() const {
 	Expects(_streamed != nullptr);
 
 	const auto position = base::take(_streamed->startPosition);
+	_streamed->resuming = position.has_value();
 	auto options = ::Media::Streaming::PlaybackOptions();
 	options.audioId = AudioMsgId(_data, _realParent->fullId());
 	options.waitForMarkAsShown = true;
@@ -2665,6 +2667,9 @@ void Gif::handleStreamingUpdate(::Media::Streaming::Update &&update) {
 }
 
 void Gif::handleStreamingError(::Media::Streaming::Error &&error) {
+	if (_streamed && _streamed->resuming) {
+		stopAnimation();
+	}
 }
 
 void Gif::repaintStreamedContent() {
@@ -2681,6 +2686,7 @@ void Gif::repaintStreamedContent() {
 void Gif::streamingReady(::Media::Streaming::Information &&info) {
 	Expects(_streamed != nullptr);
 
+	_streamed->resuming = false;
 	const auto chosen = _streamed->chosen;
 	const auto measured = info.video.realSize;
 	const auto video = measured.isEmpty() ? nullptr : chosen->video();

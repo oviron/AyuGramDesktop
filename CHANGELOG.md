@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.4.4-3 - 2026-11-19
+
+- An autoplaying video in a chat keeps its position when the inline player
+  switches to another quality, and keeps playing when its message view is
+  rebuilt. Before, it could jump back to the start a few seconds in.
+- A video that is already playing follows a quality that another video has
+  switched to instead of staying on its lower rendition, and starts over
+  instead of freezing if the new rendition fails to open.
+- The video player no longer reads or writes its own state, or its audio
+  track's, after an update handler has destroyed it, which the automatic
+  quality switch can do. In the media viewer that was a use of freed memory.
+
 ## 7.4.4-2 - 2026-11-18
 
 - AI summaries of messages now always ask the server for the reader's

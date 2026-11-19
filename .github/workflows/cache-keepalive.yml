@@ -4,12 +4,13 @@ name: Cache keepalive
 # raisable on a free account. Scheduled runs use the default branch, which is
 # the only scope every release branch can read.
 #
-# Every path below must be spelled exactly as the release workflow spells it:
-# the path is hashed into the cache entry's version, so a restore that writes
-# the same bytes to a differently written path misses and refreshes nothing.
+# A lookup counts as a read and downloads nothing. Every path below must be
+# written exactly as the release job's runner sees it: the path is hashed into
+# the cache entry's version, so a lookup with a differently written path
+# misses, and a miss fails the job instead of refreshing nothing in silence.
 on:
   schedule:
-    - cron: '0 5 * * 1,4'
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,8 +23,11 @@ concurrency:
 jobs:
   macos:
     name: macOS caches
-    runs-on: macos-15
-    timeout-minutes: 30
+    # Not a macOS runner: those are the ones in short supply, and a job that
+    # never gets one refreshes nothing. Outside Windows the entry version does
+    # not depend on the runner, so the macOS workspace path is written out.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/cache/restore@v6
         with:
@@ -32,21 +36,30 @@ jobs:
             ThirdParty
           key: macos-universal-release-
           restore-keys: macos-universal-release-
+          lookup-only: true
+          fail-on-cache-miss: true
       - uses: actions/cache/restore@v6
+        if: ${{ !cancelled() }}
         with:
-          path: ${{ github.workspace }}/ccache
+          path: /Users/runner/work/AyuGramDesktop/AyuGramDesktop/ccache
           key: ccache-macos-arm64-release-
           restore-keys: ccache-macos-arm64-release-
+          lookup-only: true
+          fail-on-cache-miss: true
       - uses: actions/cache/restore@v6
+        if: ${{ !cancelled() }}
         with:
-          path: ${{ github.workspace }}/ccache
+          path: /Users/runner/work/AyuGramDesktop/AyuGramDesktop/ccache
           key: ccache-macos-x86_64-release-
           restore-keys: ccache-macos-x86_64-release-
+          lookup-only: true
+          fail-on-cache-miss: true
 
   windows:
     name: Windows caches
+    # A Windows entry carries a Windows-only marker in its version.
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       TBUILD: ${{ github.workspace }}\TBuild
     steps:
@@ -55,13 +68,21 @@ jobs:
           path: ${{ env.TBUILD }}\ThirdParty
           key: windows-x64-third-party-
           restore-keys: windows-x64-third-party-
+          lookup-only: true
+          fail-on-cache-miss: true
       - uses: actions/cache/restore@v6
+        if: ${{ !cancelled() }}
         with:
           path: ${{ env.TBUILD }}\Libraries\win64
           key: windows-x64-release-libraries-
           restore-keys: windows-x64-release-libraries-
+          lookup-only: true
+          fail-on-cache-miss: true
       - uses: actions/cache/restore@v6
+        if: ${{ !cancelled() }}
         with:
           path: ${{ env.TBUILD }}\ccache
           key: ccache-windows-x64-release-
           restore-keys: ccache-windows-x64-release-
+          lookup-only: true
+          fail-on-cache-miss: true

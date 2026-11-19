@@ -148,15 +148,19 @@ placed on `C:` gets through the compile and dies on the link, three hours in.
 The Windows job prints `df -h` into the log for this reason, since the fuller
 report in the run summary cannot be read without a GitHub login.
 
-`Cache keepalive` runs twice a week and restores every key prefix, spelling
-each path exactly as the release workflow spells it. The path is hashed into
-the cache entry's version, so a keepalive that writes the same bytes to a
-differently written path misses every entry and refreshes nothing. GitHub
-evicts a cache nothing has read for seven days; raising that window requires a
-paid plan. Scheduled runs always use the default branch, which is both the
-scope the release needs and the only place GitHub will start them from. GitHub
-also disables scheduled workflows in a repository with no activity for sixty
-days, which would stop the refreshing silently.
+`Cache keepalive` runs daily and looks every key prefix up without downloading
+it: a lookup counts as a read. GitHub evicts a cache nothing has read for seven
+days; raising that window requires a paid plan. Each path is written exactly
+as the release job's runner sees it, because the path is hashed into the cache
+entry's version, and a lookup that misses fails the job. On Windows the
+version also carries a Windows-only marker, so the Windows entries need a
+Windows runner. Elsewhere it does not depend on the runner, and the macOS
+entries are looked up from Linux with the macOS workspace path written out:
+macOS runners are the ones in short supply, and a keepalive that waits for one
+refreshes nothing. Scheduled runs always use the default branch, which is both
+the scope the release needs and the only place GitHub will start them from.
+GitHub also disables scheduled workflows in a repository with no activity for
+sixty days, which would stop the refreshing silently.
 
 The compiler cache key deliberately carries no toolchain fingerprint. `ccache`
 already hashes the compiler through `compiler_check = content`, so a runner

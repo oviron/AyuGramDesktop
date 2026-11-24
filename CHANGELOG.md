@@ -1,5 +1,20 @@
 # Changelog
 
+## 7.4.6 - 2026-11-24
+
+- Updated the application base to Telegram Desktop 7.4.6 ahead of an AyuGram
+  release of it: mini app previews in bot profiles, buying, selling and
+  repricing on-chain gifts for Grams with the network fee shown, gift offers
+  and listings in the wallet history, the current owner of a collectible
+  from its gift notification, spoilers no longer repainted while nothing of
+  them is visible, and a fix for pending suggestions being cleared.
+- Interactive widgets in bot messages now run in a separate helper process,
+  `TelegramWidgetHelper`. The application accepts only the helper it was
+  built with, so the macOS bundle and both Windows packages ship it
+  unchanged.
+- `lib_ui` comes from this fork's copy of AyuGram's branch with Telegram
+  Desktop 7.4.6 merged in; `codegen` and `lib_tl` did not move.
+
 ## 7.4.4-3 - 2026-11-19
 
 - An autoplaying video in a chat keeps its position when the inline player

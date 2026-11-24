@@ -324,6 +324,20 @@ jobs:
     env:
       VERSION: ${{ needs.validate.outputs.version }}
     steps:
+      # sign_mac.py signs the nested code but leaves the widget helper as
+      # built: an ad-hoc signed app accepts only the helper whose CDHash it
+      # embedded at build time.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          path: src
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            Telegram/build/sign_mac.py
+            Telegram/cmake/widget_helper_identity.py
+            Telegram/Telegram/TelegramWidgetHelper.entitlements
+            Telegram/Telegram/TelegramWidgetHelperDirect.entitlements
       - uses: actions/download-artifact@v8
         with:
           pattern: macos-app-*
@@ -337,6 +351,9 @@ jobs:
           app=release/AyuGram.app
           arm=mac-apps/arm64/AyuGram.app
           intel=mac-apps/x86_64/AyuGram.app
+          helper=Contents/Helpers/TelegramWidgetHelper
+          python3 src/Telegram/build/sign_mac.py --check "$arm"
+          python3 src/Telegram/build/sign_mac.py --check "$intel"
           rm -rf release dmg artifacts
           mkdir -p release
           ditto "$arm" "$app"
@@ -394,7 +411,16 @@ jobs:
           test -s "$app/Contents/Resources/$icon_name"
           test ! -e "$app/Contents/Frameworks/Updater"
           /usr/bin/strip -x "$app/Contents/MacOS/AyuGram"
-          codesign --force --deep --sign - "$app"
+          python3 src/Telegram/build/sign_mac.py --identity - "$app"
+          cdhash() {
+            codesign -d --verbose=3 --arch "$1" "$2" 2>&1 | sed -n 's/^CDHash=//p'
+          }
+          for pair in "arm64:$arm" "x86_64:$intel"; do
+            architecture=${pair%%:*}
+            built=$(cdhash "$architecture" "${pair#*:}/$helper")
+            test -n "$built"
+            test "$(cdhash "$architecture" "$app/$helper")" = "$built"
+          done
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv --verbose=4 "$app"
           mkdir -p dmg artifacts
@@ -675,6 +701,9 @@ jobs:
           if ($signature.Status -ne 'NotSigned') { throw "Unexpected application signature status: $($signature.Status)." }
           $d3d = Join-Path $out 'modules\x64\d3d\d3dcompiler_47.dll'
           if (-not (Test-Path $d3d)) { throw 'D3D compiler module is missing.' }
+          $helper = Join-Path $out 'modules\x64\TelegramWidgetHelper.exe'
+          if (-not (Test-Path $helper)) { throw 'Widget helper is missing.' }
+          if ((Get-AuthenticodeSignature $helper).Status -ne 'NotSigned') { throw 'Unexpected widget helper signature.' }
           if (-not (Test-Path (Join-Path $env:SRC 'Telegram\Resources\art\icon256.ico'))) { throw 'Windows application icon is missing.' }
           choco install innosetup --version=6.7.1 --no-progress -y
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
@@ -691,6 +720,8 @@ jobs:
           New-Item -ItemType Directory -Force (Join-Path $portable 'modules\x64\d3d') | Out-Null
           Copy-Item $binary (Join-Path $portable 'AyuGram.exe')
           Copy-Item $d3d (Join-Path $portable 'modules\x64\d3d\d3dcompiler_47.dll')
+          # The application pins the helper's digest, so it is copied as built.
+          Copy-Item $helper (Join-Path $portable 'modules\x64\TelegramWidgetHelper.exe')
           & 7z a -mx9 (Join-Path $artifacts 'AyuGram.zip') $portable
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & 7z t (Join-Path $artifacts 'AyuGram.zip')
@@ -701,6 +732,9 @@ jobs:
           if (-not (Test-Path (Join-Path $install 'AyuGram.exe'))) { throw 'Installed application is missing.' }
           if (Test-Path (Join-Path $install 'Updater.exe')) { throw 'Installer included the updater.' }
           if (-not (Test-Path (Join-Path $install 'modules\x64\d3d\d3dcompiler_47.dll'))) { throw 'Installer omitted the D3D module.' }
+          $installedHelper = Join-Path $install 'modules\x64\TelegramWidgetHelper.exe'
+          if (-not (Test-Path $installedHelper)) { throw 'Installer omitted the widget helper.' }
+          if ((Get-FileHash $installedHelper).Hash -ne (Get-FileHash $helper).Hash) { throw 'Installer changed the widget helper.' }
       - uses: actions/upload-artifact@v7
         with:
           name: release-windows

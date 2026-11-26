@@ -283,6 +283,17 @@ jobs:
         if: ${{ success() && steps.compiler-cache.outputs.cache-hit != 'true' }}
         continue-on-error: true
         run: ccache --evict-older-than 21600s
+      - name: Bound an unfinished build's compiler cache
+        # A failed or cancelled build is not trimmed by age: the retry still
+        # needs the objects this run did not reach. Left at the build-time
+        # maximum, the compiler caches and the dependency trees pass the ten
+        # gigabyte limit together, and the eviction takes a dependency tree.
+        # This size holds a full build; ccache drops older objects first.
+        if: ${{ (failure() || cancelled()) && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        env:
+          CCACHE_MAXSIZE: 1200M
+        run: ccache --cleanup
       - name: Drop superseded compiler caches
         # Same condition as the save below: an empty key would keep nothing.
         if: ${{ always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true' }}
@@ -652,6 +663,18 @@ jobs:
         continue-on-error: true
         shell: bash
         run: ccache --evict-older-than 21600s
+      - name: Bound an unfinished build's compiler cache
+        # A failed or cancelled build is not trimmed by age: the retry still
+        # needs the objects this run did not reach. Left at the build-time
+        # maximum, the compiler caches and the dependency trees pass the ten
+        # gigabyte limit together, and the eviction takes a dependency tree.
+        # This size holds a full build; ccache drops older objects first.
+        if: ${{ (failure() || cancelled()) && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          CCACHE_MAXSIZE: 2400M
+        run: ccache --cleanup
       - name: Drop superseded compiler caches
         # Same condition as the save below: an empty key would keep nothing.
         if: ${{ always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true' }}

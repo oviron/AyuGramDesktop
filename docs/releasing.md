@@ -129,6 +129,17 @@ refills. A successful build also evicts every object it did not use before the
 save. Without that, each version leaves the previous one's objects behind, the
 compiler caches fill to their maximum, and the six entries pass the limit.
 
+A failed or cancelled build cannot be trimmed that way, because the retry
+still needs the objects it did not reach. It is cut to a fixed size instead,
+1.2 GB on macOS and 2.4 GB on Windows: enough for every object of one build.
+`ccache` drops the older objects of each of its subdirectories first, so the
+cut is close to least recently used rather than exactly that. On 7.4.6 both macOS jobs were cancelled at
+the job time limit and saved 1.85 GB each where a finished build leaves
+0.95 GB; the six entries came to 10.26 GB, which is 9.56 GiB, and all three
+dependency caches were gone within minutes, so the limit appears to be
+decimal. Until the next release rebuilds them, `Cache keepalive` fails on the
+missing keys.
+
 The Windows compiler cache is three gigabytes rather than two. A Release build
 compiles about 2550 translation units, which occupy 2.2 GB; in two gigabytes
 the cache evicted its own entries while the build was still running, and the

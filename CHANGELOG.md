@@ -1,5 +1,18 @@
 # Changelog
 
+## 7.4.7 - 2026-11-27
+
+- Updated the application base to Telegram Desktop 7.4.7 ahead of an AyuGram
+  release of it: text on Windows is antialiased like in other modern
+  applications again, with the system font when font smoothing is off;
+  a streamed video restarts cleanly after a failed part and falls back to the
+  software decoder when a hardware one fails to open; account pictures show
+  in the macOS 27 tray menu; links open without auto-login while the
+  application is locked; long formulas render again; and fixes to checklists,
+  chat export, the debug log and connection recovery.
+- `lib_ui` and `codegen` come from this fork's copies of AyuGram's branches
+  with Telegram Desktop 7.4.7 merged in; `lib_tl` did not move.
+
 ## 7.4.6 - 2026-11-24
 
 - Updated the application base to Telegram Desktop 7.4.6 ahead of an AyuGram
